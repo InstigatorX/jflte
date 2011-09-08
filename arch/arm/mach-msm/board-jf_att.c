@@ -63,6 +63,7 @@
 #include <mach/socinfo.h>
 #include <mach/msm_spi.h>
 #include "timer.h"
+#include "core.h"
 #include "devices.h"
 #include <mach/gpio.h>
 #include <mach/gpiomux.h>
@@ -5626,6 +5627,7 @@ static void __init samsung_jf_init(void)
 }
 
 MACHINE_START(JF, "SAMSUNG JF")
+	.smp = smp_ops(msm_smp_ops),
 	.map_io = apq8064_map_io,
 	.reserve = apq8064_reserve,
 	.init_irq = apq8064_init_irq,

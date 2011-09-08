@@ -9823,6 +9823,7 @@ static int bahama_bt(int on)
 
 	u8 version;
 
+<<<<<<< HEAD
 	const struct bahama_config_register v10_bt_on[] = {
 		{ 0xE9, 0x00, 0xFF },
 		{ 0xF4, 0x80, 0xFF },
@@ -9961,6 +9962,12 @@ static int bahama_bt(int on)
 }
 
 static int bluetooth_use_regulators(int on)
+=======
+#include "core.h"
+
+static void __init msm8x60_fixup(struct tag *tag, char **cmdline,
+		struct meminfo *mi)
+>>>>>>> 44ea349... ARM: SoC: convert MSM to SMP operations
 {
 	int i, recover = -1, rc = 0;
 
@@ -10476,12 +10483,19 @@ static void __init msm8x60_charm_init_early(void)
 	msm8x60_allocate_memory_regions();
 }
 
+<<<<<<< HEAD
 static void __init msm8x60_dragon_init(void)
 {
 	msm8x60_init(&msm8x60_dragon_board_data);
 }
 
 MACHINE_START(MSM8X60_SURF, "QCT MSM8X60 SURF")
+=======
+MACHINE_START(MSM8X60_RUMI3, "QCT MSM8X60 RUMI3")
+	.smp = smp_ops(msm_smp_ops),
+	.fixup = msm8x60_fixup,
+	.reserve = msm8x60_reserve,
+>>>>>>> 44ea349... ARM: SoC: convert MSM to SMP operations
 	.map_io = msm8x60_map_io,
 	.reserve = msm8x60_reserve,
 	.init_irq = msm8x60_init_irq,
@@ -10492,7 +10506,14 @@ MACHINE_START(MSM8X60_SURF, "QCT MSM8X60 SURF")
 	.restart = msm_restart,
 MACHINE_END
 
+<<<<<<< HEAD
 MACHINE_START(MSM8X60_FFA, "QCT MSM8X60 FFA")
+=======
+MACHINE_START(MSM8X60_SURF, "QCT MSM8X60 SURF")
+	.smp = smp_ops(msm_smp_ops),
+	.fixup = msm8x60_fixup,
+	.reserve = msm8x60_reserve,
+>>>>>>> 44ea349... ARM: SoC: convert MSM to SMP operations
 	.map_io = msm8x60_map_io,
 	.reserve = msm8x60_reserve,
 	.init_irq = msm8x60_init_irq,
@@ -10503,7 +10524,14 @@ MACHINE_START(MSM8X60_FFA, "QCT MSM8X60 FFA")
 	.restart = msm_restart,
 MACHINE_END
 
+<<<<<<< HEAD
 MACHINE_START(MSM8X60_FLUID, "QCT MSM8X60 FLUID")
+=======
+MACHINE_START(MSM8X60_SIM, "QCT MSM8X60 SIMULATOR")
+	.smp = smp_ops(msm_smp_ops),
+	.fixup = msm8x60_fixup,
+	.reserve = msm8x60_reserve,
+>>>>>>> 44ea349... ARM: SoC: convert MSM to SMP operations
 	.map_io = msm8x60_map_io,
 	.reserve = msm8x60_reserve,
 	.init_irq = msm8x60_init_irq,
@@ -10514,8 +10542,14 @@ MACHINE_START(MSM8X60_FLUID, "QCT MSM8X60 FLUID")
 	.restart = msm_restart,
 MACHINE_END
 
+<<<<<<< HEAD
 MACHINE_START(MSM8X60_FUSION, "QCT MSM8X60 FUSION SURF")
 	.map_io = msm8x60_map_io,
+=======
+MACHINE_START(MSM8X60_FFA, "QCT MSM8X60 FFA")
+	.smp = smp_ops(msm_smp_ops),
+	.fixup = msm8x60_fixup,
+>>>>>>> 44ea349... ARM: SoC: convert MSM to SMP operations
 	.reserve = msm8x60_reserve,
 	.init_irq = msm8x60_init_irq,
 	.handle_irq = gic_handle_irq,
@@ -10536,7 +10570,14 @@ MACHINE_START(MSM8X60_FUSN_FFA, "QCT MSM8X60 FUSION FFA")
 	.restart = msm_restart,
 MACHINE_END
 
+<<<<<<< HEAD
 MACHINE_START(MSM8X60_DRAGON, "QCT MSM8X60 DRAGON")
+=======
+#ifdef CONFIG_OF
+/* TODO: General device tree support for all MSM. */
+DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
+	.smp = smp_ops(msm_smp_ops),
+>>>>>>> 44ea349... ARM: SoC: convert MSM to SMP operations
 	.map_io = msm8x60_map_io,
 	.reserve = msm8x60_reserve,
 	.init_irq = msm8x60_init_irq,
