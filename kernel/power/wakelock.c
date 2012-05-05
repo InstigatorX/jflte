@@ -49,21 +49,18 @@ module_param_named(debug_mask, debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
 #define WAKE_LOCK_AUTO_EXPIRE            (1U << 10)
 #define WAKE_LOCK_PREVENTING_SUSPEND     (1U << 11)
 
-#define WL_GC_COUNT_MAX	100
-#define WL_GC_TIME_SEC	300
-
 static DEFINE_MUTEX(wakelocks_lock);
 
 struct wakelock {
 	char			*name;
 	struct rb_node		node;
 	struct wakeup_source	ws;
+#ifdef CONFIG_PM_WAKELOCKS_GC
 	struct list_head	lru;
+#endif
 };
 
 static struct rb_root wakelocks_tree = RB_ROOT;
-static LIST_HEAD(wakelocks_lru_list);
-static unsigned int wakelocks_gc_count;
 
 static DEFINE_SPINLOCK(list_lock);
 static LIST_HEAD(inactive_locks);
@@ -703,7 +700,7 @@ ssize_t pm_show_wakelocks(char *buf, bool show_active)
 	return (str - buf);
 }
 
-#if CONFIG_PM_WAKELOCKS_LIMIT > 0
+#ifdef CONFIG_PM_WAKELOCKS_LIMIT
 static unsigned int number_of_wakelocks;
 
 static inline bool wakelocks_limit_exceeded(void)
@@ -725,6 +722,61 @@ static inline bool wakelocks_limit_exceeded(void) { return false; }
 static inline void increment_wakelocks_number(void) {}
 static inline void decrement_wakelocks_number(void) {}
 #endif /* CONFIG_PM_WAKELOCKS_LIMIT */
+
+#ifdef CONFIG_PM_WAKELOCKS_GC
+#define WL_GC_COUNT_MAX	100
+#define WL_GC_TIME_SEC	300
+
+static LIST_HEAD(wakelocks_lru_list);
+static unsigned int wakelocks_gc_count;
+
+static inline void wakelocks_lru_add(struct wakelock *wl)
+{
+	list_add(&wl->lru, &wakelocks_lru_list);
+}
+
+static inline void wakelocks_lru_most_recent(struct wakelock *wl)
+{
+	list_move(&wl->lru, &wakelocks_lru_list);
+}
+
+static void wakelocks_gc(void)
+{
+	struct wakelock *wl, *aux;
+	ktime_t now;
+
+	if (++wakelocks_gc_count <= WL_GC_COUNT_MAX)
+		return;
+
+	now = ktime_get();
+	list_for_each_entry_safe_reverse(wl, aux, &wakelocks_lru_list, lru) {
+		u64 idle_time_ns;
+		bool active;
+
+		spin_lock_irq(&wl->ws.lock);
+		idle_time_ns = ktime_to_ns(ktime_sub(now, wl->ws.last_time));
+		active = wl->ws.active;
+		spin_unlock_irq(&wl->ws.lock);
+
+		if (idle_time_ns < ((u64)WL_GC_TIME_SEC * NSEC_PER_SEC))
+			break;
+
+		if (!active) {
+			wakeup_source_remove(&wl->ws);
+			rb_erase(&wl->node, &wakelocks_tree);
+			list_del(&wl->lru);
+			kfree(wl->name);
+			kfree(wl);
+			decrement_wakelocks_number();
+		}
+	}
+	wakelocks_gc_count = 0;
+}
+#else /* !CONFIG_PM_WAKELOCKS_GC */
+static inline void wakelocks_lru_add(struct wakelock *wl) {}
+static inline void wakelocks_lru_most_recent(struct wakelock *wl) {}
+static inline void wakelocks_gc(void) {}
+#endif /* !CONFIG_PM_WAKELOCKS_GC */
 
 static struct wakelock *wakelock_lookup_add(const char *name, size_t len,
 					    bool add_if_not_found)
@@ -770,7 +822,7 @@ static struct wakelock *wakelock_lookup_add(const char *name, size_t len,
 	wakeup_source_add(&wl->ws);
 	rb_link_node(&wl->node, parent, node);
 	rb_insert_color(&wl->node, &wakelocks_tree);
-	list_add(&wl->lru, &wakelocks_lru_list);
+	wakelocks_lru_add(wl);
 	increment_wakelocks_number();
 	return wl;
 }
@@ -813,40 +865,11 @@ int pm_wake_lock(const char *buf)
 		__pm_stay_awake(&wl->ws);
 	}
 
-	list_move(&wl->lru, &wakelocks_lru_list);
+	wakelocks_lru_most_recent(wl);
 
  out:
 	mutex_unlock(&wakelocks_lock);
 	return ret;
-}
-
-static void wakelocks_gc(void)
-{
-	struct wakelock *wl, *aux;
-	ktime_t now = ktime_get();
-
-	list_for_each_entry_safe_reverse(wl, aux, &wakelocks_lru_list, lru) {
-		u64 idle_time_ns;
-		bool active;
-
-		spin_lock_irq(&wl->ws.lock);
-		idle_time_ns = ktime_to_ns(ktime_sub(now, wl->ws.last_time));
-		active = wl->ws.active;
-		spin_unlock_irq(&wl->ws.lock);
-
-		if (idle_time_ns < ((u64)WL_GC_TIME_SEC * NSEC_PER_SEC))
-			break;
-
-		if (!active) {
-			wakeup_source_remove(&wl->ws);
-			rb_erase(&wl->node, &wakelocks_tree);
-			list_del(&wl->lru);
-			kfree(wl->name);
-			kfree(wl);
-			decrement_wakelocks_number();
-		}
-	}
-	wakelocks_gc_count = 0;
 }
 
 int pm_wake_unlock(const char *buf)
@@ -873,9 +896,9 @@ int pm_wake_unlock(const char *buf)
 		goto out;
 	}
 	__pm_relax(&wl->ws);
-	list_move(&wl->lru, &wakelocks_lru_list);
-	if (++wakelocks_gc_count > WL_GC_COUNT_MAX)
-		wakelocks_gc();
+
+	wakelocks_lru_most_recent(wl);
+	wakelocks_gc();
 
  out:
 	mutex_unlock(&wakelocks_lock);
