@@ -24,8 +24,6 @@
 
 #include "core.h"
 
-extern volatile int pen_release;
-
 struct msm_hotplug_device {
 	struct completion cpu_killed;
 	unsigned int warm_boot;
