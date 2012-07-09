@@ -221,9 +221,6 @@ static void lapic_timer_state_broadcast(struct acpi_processor *pr,
 
 #endif
 
-/*
- * Suspend / resume control
- */
 static u32 saved_bm_rld;
 
 static void acpi_idle_bm_rld_save(void)
@@ -754,6 +751,7 @@ static int acpi_idle_enter_c1(struct cpuidle_device *dev,
 
 	local_irq_disable();
 
+
 	lapic_timer_state_broadcast(pr, cx, 1);
 	kt1 = ktime_get_real();
 	acpi_idle_do_entry(cx);
@@ -822,6 +820,7 @@ static int acpi_idle_enter_simple(struct cpuidle_device *dev,
 		return -EINVAL;
 
 	local_irq_disable();
+
 
 	if (cx->entry_method != ACPI_CSTATE_FFH) {
 		current_thread_info()->status &= ~TS_POLLING;
@@ -914,6 +913,7 @@ static int acpi_idle_enter_bm(struct cpuidle_device *dev,
 	}
 
 	local_irq_disable();
+
 
 	if (cx->entry_method != ACPI_CSTATE_FFH) {
 		current_thread_info()->status &= ~TS_POLLING;
