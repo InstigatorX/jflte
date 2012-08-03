@@ -392,6 +392,128 @@ static bool cm_monitor(void)
 	return stop;
 }
 
+/**
+ * _setup_polling - Setup the next instance of polling.
+ * @work: work_struct of the function _setup_polling.
+ */
+static void _setup_polling(struct work_struct *work)
+{
+	unsigned long min = ULONG_MAX;
+	struct charger_manager *cm;
+	bool keep_polling = false;
+	unsigned long _next_polling;
+
+	mutex_lock(&cm_list_mtx);
+
+	list_for_each_entry(cm, &cm_list, entry) {
+		if (is_polling_required(cm) && cm->desc->polling_interval_ms) {
+			keep_polling = true;
+
+			if (min > cm->desc->polling_interval_ms)
+				min = cm->desc->polling_interval_ms;
+		}
+	}
+
+	polling_jiffy = msecs_to_jiffies(min);
+	if (polling_jiffy <= CM_JIFFIES_SMALL)
+		polling_jiffy = CM_JIFFIES_SMALL + 1;
+
+	if (!keep_polling)
+		polling_jiffy = ULONG_MAX;
+	if (polling_jiffy == ULONG_MAX)
+		goto out;
+
+	WARN(cm_wq == NULL, "charger-manager: workqueue not initialized"
+			    ". try it later. %s\n", __func__);
+
+	_next_polling = jiffies + polling_jiffy;
+
+	if (!delayed_work_pending(&cm_monitor_work) ||
+	    (delayed_work_pending(&cm_monitor_work) &&
+	     time_after(next_polling, _next_polling))) {
+		next_polling = jiffies + polling_jiffy;
+		mod_delayed_work(cm_wq, &cm_monitor_work, polling_jiffy);
+	}
+
+out:
+	mutex_unlock(&cm_list_mtx);
+}
+static DECLARE_WORK(setup_polling, _setup_polling);
+
+/**
+ * cm_monitor_poller - The Monitor / Poller.
+ * @work: work_struct of the function cm_monitor_poller
+ *
+ * During non-suspended state, cm_monitor_poller is used to poll and monitor
+ * the batteries.
+ */
+static void cm_monitor_poller(struct work_struct *work)
+{
+	cm_monitor();
+	schedule_work(&setup_polling);
+}
+
+/**
+ * fullbatt_handler - Event handler for CM_EVENT_BATT_FULL
+ * @cm: the Charger Manager representing the battery.
+ */
+static void fullbatt_handler(struct charger_manager *cm)
+{
+	struct charger_desc *desc = cm->desc;
+
+	if (!desc->fullbatt_vchkdrop_uV || !desc->fullbatt_vchkdrop_ms)
+		goto out;
+
+	if (cm_suspended)
+		device_set_wakeup_capable(cm->dev, true);
+
+	mod_delayed_work(cm_wq, &cm->fullbatt_vchk_work,
+			 msecs_to_jiffies(desc->fullbatt_vchkdrop_ms));
+	cm->fullbatt_vchk_jiffies_at = jiffies + msecs_to_jiffies(
+				       desc->fullbatt_vchkdrop_ms);
+
+	if (cm->fullbatt_vchk_jiffies_at == 0)
+		cm->fullbatt_vchk_jiffies_at = 1;
+
+out:
+	dev_info(cm->dev, "EVENT_HANDLE: Battery Fully Charged.\n");
+	uevent_notify(cm, default_event_names[CM_EVENT_BATT_FULL]);
+}
+
+/**
+ * battout_handler - Event handler for CM_EVENT_BATT_OUT
+ * @cm: the Charger Manager representing the battery.
+ */
+static void battout_handler(struct charger_manager *cm)
+{
+	if (cm_suspended)
+		device_set_wakeup_capable(cm->dev, true);
+
+	if (!is_batt_present(cm)) {
+		dev_emerg(cm->dev, "Battery Pulled Out!\n");
+		uevent_notify(cm, default_event_names[CM_EVENT_BATT_OUT]);
+	} else {
+		uevent_notify(cm, "Battery Reinserted?");
+	}
+}
+
+/**
+ * misc_event_handler - Handler for other evnets
+ * @cm: the Charger Manager representing the battery.
+ * @type: the Charger Manager representing the battery.
+ */
+static void misc_event_handler(struct charger_manager *cm,
+			enum cm_event_types type)
+{
+	if (cm_suspended)
+		device_set_wakeup_capable(cm->dev, true);
+
+	if (!delayed_work_pending(&cm_monitor_work) &&
+	    is_polling_required(cm) && cm->desc->polling_interval_ms)
+		schedule_work(&setup_polling);
+	uevent_notify(cm, default_event_names[type]);
+}
+
 static int charger_get_property(struct power_supply *psy,
 		enum power_supply_property psp,
 		union power_supply_propval *val)
