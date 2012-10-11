@@ -313,7 +313,7 @@ static int
 cpu_needs_another_gp(struct rcu_state *rsp, struct rcu_data *rdp)
 {
 	return *rdp->nxttail[RCU_DONE_TAIL +
-			     (ACCESS_ONCE(rsp->completed) != rdp->completed)] &&
+			     ACCESS_ONCE(rsp->completed) != rdp->completed] &&
 	       !rcu_gp_in_progress(rsp);
 }
 
@@ -873,29 +873,6 @@ static void record_gp_stall_check_time(struct rcu_state *rsp)
 	rsp->jiffies_stall = jiffies + jiffies_till_stall_check();
 }
 
-/*
- * Dump stacks of all tasks running on stalled CPUs.  This is a fallback
- * for architectures that do not implement trigger_all_cpu_backtrace().
- * The NMI-triggered stack traces are more accurate because they are
- * printed by the target CPU.
- */
-static void rcu_dump_cpu_stacks(struct rcu_state *rsp)
-{
-	int cpu;
-	unsigned long flags;
-	struct rcu_node *rnp;
-
-	rcu_for_each_leaf_node(rsp, rnp) {
-		raw_spin_lock_irqsave(&rnp->lock, flags);
-		if (rnp->qsmask != 0) {
-			for (cpu = 0; cpu <= rnp->grphi - rnp->grplo; cpu++)
-				if (rnp->qsmask & (1UL << cpu))
-					dump_cpu_task(rnp->grplo + cpu);
-		}
-		raw_spin_unlock_irqrestore(&rnp->lock, flags);
-	}
-}
-
 static void print_other_cpu_stall(struct rcu_state *rsp)
 {
 	int cpu;
@@ -903,7 +880,6 @@ static void print_other_cpu_stall(struct rcu_state *rsp)
 	unsigned long flags;
 	int ndetected = 0;
 	struct rcu_node *rnp = rcu_get_root(rsp);
-	long totqlen = 0;
 
 	/* Only let one CPU complain about others per time interval. */
 
@@ -948,15 +924,12 @@ static void print_other_cpu_stall(struct rcu_state *rsp)
 	raw_spin_unlock_irqrestore(&rnp->lock, flags);
 
 	print_cpu_stall_info_end();
-	for_each_possible_cpu(cpu)
-		totqlen += per_cpu_ptr(rsp->rda, cpu)->qlen;
-	pr_cont("(detected by %d, t=%ld jiffies, g=%lu, c=%lu, q=%lu)\n",
-	       smp_processor_id(), (long)(jiffies - rsp->gp_start),
-	       rsp->gpnum, rsp->completed, totqlen);
+	printk(KERN_CONT "(detected by %d, t=%ld jiffies)\n",
+	       smp_processor_id(), (long)(jiffies - rsp->gp_start));
 	if (ndetected == 0)
 		printk(KERN_ERR "INFO: Stall ended before state dump start\n");
 	else if (!trigger_all_cpu_backtrace())
-		rcu_dump_cpu_stacks(rsp);
+		dump_stack();
 
 	/* Complain about tasks blocking the grace period. */
 
@@ -967,10 +940,8 @@ static void print_other_cpu_stall(struct rcu_state *rsp)
 
 static void print_cpu_stall(struct rcu_state *rsp)
 {
-	int cpu;
 	unsigned long flags;
 	struct rcu_node *rnp = rcu_get_root(rsp);
-	long totqlen = 0;
 
 	/*
 	 * OK, time to rat on ourselves...
@@ -981,10 +952,7 @@ static void print_cpu_stall(struct rcu_state *rsp)
 	print_cpu_stall_info_begin();
 	print_cpu_stall_info(rsp, smp_processor_id());
 	print_cpu_stall_info_end();
-	for_each_possible_cpu(cpu)
-		totqlen += per_cpu_ptr(rsp->rda, cpu)->qlen;
-	pr_cont(" (t=%lu jiffies g=%lu c=%lu q=%lu)\n",
-		jiffies - rsp->gp_start, rsp->gpnum, rsp->completed, totqlen);
+	printk(KERN_CONT " (t=%lu jiffies)\n", jiffies - rsp->gp_start);
 	if (!trigger_all_cpu_backtrace())
 		dump_stack();
 
@@ -2256,10 +2224,7 @@ void synchronize_sched(void)
 			   "Illegal synchronize_sched() in RCU-sched read-side critical section");
 	if (rcu_blocking_is_gp())
 		return;
-	if (rcu_expedited)
-		synchronize_sched_expedited();
-	else
-		wait_rcu_gp(call_rcu_sched);
+	wait_rcu_gp(call_rcu_sched);
 }
 EXPORT_SYMBOL_GPL(synchronize_sched);
 
@@ -2280,10 +2245,7 @@ void synchronize_rcu_bh(void)
 			   "Illegal synchronize_rcu_bh() in RCU-bh read-side critical section");
 	if (rcu_blocking_is_gp())
 		return;
-	if (rcu_expedited)
-		synchronize_rcu_bh_expedited();
-	else
-		wait_rcu_gp(call_rcu_bh);
+	wait_rcu_gp(call_rcu_bh);
 }
 EXPORT_SYMBOL_GPL(synchronize_rcu_bh);
 
@@ -2391,7 +2353,7 @@ void synchronize_sched_expedited(void)
 		if (trycount++ < 10) {
 			udelay(trycount * num_online_cpus());
 		} else {
-			wait_rcu_gp(call_rcu_sched);
+			synchronize_sched();
 			return;
 		}
 
