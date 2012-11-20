@@ -1,0 +1,12 @@
+config IRQCHIP
+	def_bool y
+	depends on OF_IRQ
+
+config VERSATILE_FPGA_IRQ
+	bool
+	select IRQ_DOMAIN
+
+config VERSATILE_FPGA_IRQ_NR
+       int
+       default 4
+       depends on VERSATILE_FPGA_IRQ
