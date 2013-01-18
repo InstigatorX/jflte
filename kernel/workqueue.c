@@ -43,7 +43,7 @@
 #include <linux/idr.h>
 #include <linux/hashtable.h>
 
-#include "workqueue_sched.h"
+#include "workqueue_internal.h"
 #if defined(CONFIG_SEC_DEBUG)
 #include <mach/sec_debug.h>
 #endif
