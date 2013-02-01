@@ -200,8 +200,12 @@ static int tegra_cpu_init(struct cpufreq_policy *policy)
 	/* FIXME: what's the actual transition time? */
 	policy->cpuinfo.transition_latency = 300 * 1000;
 
+<<<<<<< HEAD
 	policy->shared_type = CPUFREQ_SHARED_TYPE_ALL;
 	cpumask_copy(policy->related_cpus, cpu_possible_mask);
+=======
+	cpumask_copy(policy->cpus, cpu_possible_mask);
+>>>>>>> 62b36cc... cpufreq: Remove unnecessary use of policy->shared_type
 
 	if (policy->cpu == 0)
 		register_pm_notifier(&tegra_cpu_pm_notifier);
