@@ -295,7 +295,6 @@ enum {
 	WQ_CPU_INTENSIVE	= 1 << 5, /* cpu instensive workqueue */
 
 	WQ_DRAINING		= 1 << 6, /* internal: workqueue is draining */
-	WQ_RESCUER		= 1 << 7, /* internal: workqueue has rescuer */
 	/*
 	 * Per-cpu workqueues are generally preferred because they tend to
 	 * show better performance thanks to cache locality.  Per-cpu
