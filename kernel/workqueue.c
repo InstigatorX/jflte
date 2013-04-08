@@ -42,6 +42,7 @@
 #include <linux/lockdep.h>
 #include <linux/idr.h>
 #include <linux/hashtable.h>
+#include <linux/moduleparam.h>
 
 #include "workqueue_internal.h"
 #if defined(CONFIG_SEC_DEBUG)
@@ -256,6 +257,15 @@ EXPORT_SYMBOL_GPL(system_freezable_wq);
 
 #define for_each_busy_worker(worker, i, pos, pool)			\
 	hash_for_each(pool->busy_hash, i, pos, worker, hentry)
+
+/* see the comment above the definition of WQ_POWER_EFFICIENT */
+#ifdef CONFIG_WQ_POWER_EFFICIENT_DEFAULT
+static bool wq_power_efficient = true;
+#else
+static bool wq_power_efficient;
+#endif
+ 
+module_param_named(power_efficient, wq_power_efficient, bool, 0444);
 
 static inline int __next_wq_cpu(int cpu, const struct cpumask *mask,
 				unsigned int sw)
@@ -3162,6 +3172,10 @@ struct workqueue_struct *__alloc_workqueue_key(const char *fmt,
 	struct workqueue_struct *wq;
 	unsigned int cpu;
 	size_t namelen;
+
+	/* see the comment above the definition of WQ_POWER_EFFICIENT */
+	if ((flags & WQ_POWER_EFFICIENT) && wq_power_efficient)
+		flags |= WQ_UNBOUND;
 
 	/* determine namelen, allocate wq and format name */
 	va_start(args, lock_name);
