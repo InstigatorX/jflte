@@ -142,7 +142,6 @@ static struct msm_pm_sleep_status_data msm_pm_slp_sts_data = {
 	.cpu_offset = MSM_ACC1_BASE - MSM_ACC0_BASE,
 	.mask = 1UL << 13,
 };
-
 struct platform_device msm8064_cpu_slp_status = {
 	.name		= "cpu_slp_status",
 	.id		= -1,
