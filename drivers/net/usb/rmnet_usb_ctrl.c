@@ -199,7 +199,7 @@ static void notification_available_cb(struct urb *urb)
 	case 0:
 	/*if non zero lenght of data received while unlink*/
 	case -ENOENT:
-		DBG_NOTI("[NACB:%d]<", iface_num);
+		pr_debug("[NACB:%d]<", iface_num);
 		/*success*/
 		break;
 
@@ -222,10 +222,9 @@ static void notification_available_cb(struct urb *urb)
 		goto resubmit_int_urb;
 	}
 
-	if (!urb->actual_length) {
-		pr_err("Received Zero actual length: %d", urb->actual_length);
+	if (!urb->actual_length)
 		return;
-	}
+
 	ctrl = urb->transfer_buffer;
 
 	switch (ctrl->bNotificationType) {
@@ -344,7 +343,7 @@ resubmit_int_urb:
 			dev_err(dev->devicep, "%s: Error re-submitting Int URB %d\n",
 					__func__, status);
 		}
-		DBG_NOTI("[CHKRA:%d]>", iface_num);
+		pr_info("[CHKRA:%d]>", iface_num);
 	}
 }
 
@@ -362,7 +361,7 @@ int rmnet_usb_ctrl_start_rx(struct rmnet_ctrl_dev *dev)
 		dev_err(dev->devicep, "%s Intr submit %d\n", __func__,
 				retval);
 	} else
-		DBG_NOTI("[CHKRA:%d]>", iface_num);
+		pr_info("[CHKRA:%d]>", iface_num);
 
 	return retval;
 }
