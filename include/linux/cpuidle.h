@@ -82,6 +82,8 @@ cpuidle_set_statedata(struct cpuidle_state_usage *st_usage, void *data)
 }
 
 struct cpuidle_device_kobj;
+struct cpuidle_state_kobj;
+struct cpuidle_driver_kobj;
 
 struct cpuidle_device {
 	unsigned int		registered:1;
