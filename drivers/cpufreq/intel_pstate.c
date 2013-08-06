@@ -743,7 +743,6 @@ static struct cpufreq_driver intel_pstate_driver = {
 	.init		= intel_pstate_cpu_init,
 	.exit		= intel_pstate_cpu_exit,
 	.name		= "intel_pstate",
-	.owner		= THIS_MODULE,
 };
 
 static void intel_pstate_exit(void)
