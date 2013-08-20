@@ -1,0 +1,3 @@
+post-build=samsung/jflteuc/jflteatt:4.2.2/JDQ39/I337UCUAMDL:user/release-keys
+post-timestamp=1376987221
+pre-device=jflteatt
