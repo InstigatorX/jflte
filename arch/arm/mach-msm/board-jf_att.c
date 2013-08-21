@@ -5463,7 +5463,7 @@ static void __init samsung_jf_init(void)
 	initialize_ssp_gpio();
 #endif
 #ifdef CONFIG_CPU_FREQ_GOV_INTELLIDEMAND
-  id_set_two_phase_freq(1566000);
+  id_set_two_phase_freq(1350000);
 #endif
 #ifdef CONFIG_MACH_JF
 	platform_device_register(&gpio_kp_pdev);
