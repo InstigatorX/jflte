@@ -751,6 +751,16 @@ static int cpufreq_add_dev_policy(unsigned int cpu,
 #ifdef CONFIG_HOTPLUG_CPU
 	struct cpufreq_governor *gov;
 
+if (cpu >= 1) {
+	cpufreq_policy_save.max = per_cpu(cpufreq_cpu_data,0)->max;    
+	cpufreq_policy_save.min = per_cpu(cpufreq_cpu_data,0)->min;
+	policy->min = cpufreq_policy_save.min;
+	policy->user_policy.min = policy->min;
+	policy->max = cpufreq_policy_save.max;
+	policy->user_policy.max = policy->max;
+	goto jump_out;
+}
+
 	gov = __find_governor(per_cpu(cpufreq_policy_save, cpu).gov);
 	if (gov) {
 		policy->governor = gov;
@@ -765,6 +775,7 @@ static int cpufreq_add_dev_policy(unsigned int cpu,
 		policy->max = per_cpu(cpufreq_policy_save, cpu).max;
 		policy->user_policy.max = policy->max;
 	}
+jump_out:
 	pr_debug("Restoring CPU%d min %d and max %d\n",
 		cpu, policy->min, policy->max);
 #endif
@@ -950,6 +961,7 @@ static int cpufreq_add_dev(struct device *dev, struct subsys_interface *sif)
 	unsigned int j;
 #ifdef CONFIG_HOTPLUG_CPU
 	int sibling;
+	struct cpufreq_policy *cp;
 #endif
 
 	if (cpu_is_offline(cpu))
@@ -1018,6 +1030,15 @@ static int cpufreq_add_dev(struct device *dev, struct subsys_interface *sif)
 	}
 	policy->user_policy.min = policy->min;
 	policy->user_policy.max = policy->max;
+	
+	if (policy->cpu >= 1) {
+		cp = per_cpu(cpufreq_cpu_data, 0);
+		policy->governor = cp->governor;
+		policy->min = cp->min;
+		policy->max = cp->max;
+		policy->user_policy.min = cp->user_policy.min;
+		policy->user_policy.max = cp->user_policy.max;
+	}
 
 	blocking_notifier_call_chain(&cpufreq_policy_notifier_list,
 				     CPUFREQ_START, policy);
@@ -1724,6 +1745,18 @@ static int __cpufreq_set_policy(struct cpufreq_policy *data,
 {
 	int ret = 0;
 
+	struct cpufreq_policy *cpu0_policy;
+	
+	if(data->cpu >= 1) {
+		pr_debug("forcing cpu0 policy on cpu\n");
+		cpu0_policy = cpufreq_cpu_get(0);
+		policy->min = cpu0_policy->min;
+		policy->max = cpu0_policy->max;
+		if(cpu0_policy->user_policy.governor) {
+			policy->governor = cpu0_policy->user_policy.governor;
+		}    
+	}
+	
 	pr_debug("setting new policy for CPU %u: %u - %u kHz\n", policy->cpu,
 		policy->min, policy->max);
 
