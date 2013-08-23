@@ -177,7 +177,7 @@ static int get_time_for_vibetonz(struct timed_output_dev *dev)
 
 static void enable_vibetonz_from_user(struct timed_output_dev *dev, int value)
 {
-	printk(KERN_DEBUG "tspdrv: Enable time = %d msec\n", value);
+	//printk(KERN_DEBUG "tspdrv: Enable time = %d msec\n", value);
 	hrtimer_cancel(&timer);
 
 	/* set_vibetonz(value); */
@@ -660,14 +660,18 @@ static int suspend(struct platform_device *pdev, pm_message_t state)
 
 		ret = 0;
 	}
+	#if defined(VIBE_DEBUG)
 	DbgOut(KERN_DEBUG "tspdrv: %s (%d).\n", __func__, ret);
+	#endif
 	return ret;
 }
 
 static int resume(struct platform_device *pdev)
 {
 	/* Restart system timers */
+	#if defined(VIBE_DEBUG)
 	DbgOut(KERN_DEBUG "tspdrv: %s.\n", __func__);
+	#endif
 	return 0;
 }
 

@@ -28,7 +28,6 @@
 
 #ifndef _TSPDRV_H
 #define _TSPDRV_H
-#define VIBE_DEBUG
 #include <mach/msm_iomap.h>
 
 #include <linux/mfd/pm8xxx/pm8921.h>
