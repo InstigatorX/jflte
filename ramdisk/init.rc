@@ -283,6 +283,12 @@ on post-fs-data
     import /init.cm.rc
 
 on boot
+    # intellidemand governor
+    chown system system /sys/devices/system/cpu/cpufreq/intellidemand/boostpulse
+    chmod 0660 /sys/devices/system/cpu/cpufreq/intellidemand/boostpulse
+    chown system system /sys/devices/system/cpu/cpufreq/intellidemand/sampling_rate
+    chmod 0660 /sys/devices/system/cpu/cpufreq/intellidemand/sampling_rate
+
     # interactive governor
     chown system system /sys/devices/system/cpu/cpufreq/interactive/timer_rate
     chmod 0660 /sys/devices/system/cpu/cpufreq/interactive/timer_rate
