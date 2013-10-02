@@ -4,7 +4,7 @@ timestamp=$(date '+%s')
 
 export LOCALVERSION="$timestamp"
 
-#export VARIANT_DEFCONFIG=ix_jf_defconfig
+#export VARIANT_DEFCONFIG=ix_jf_defconfig; make ix_jf_defconfig
 
 make -j8
 
