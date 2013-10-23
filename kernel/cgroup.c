@@ -2141,7 +2141,7 @@ out_free_group_list:
 	flex_array_free(group);
 	return retval;
 }
-#ifndef CONFIG_ZRAM_FOR_ANDROID
+
 static int cgroup_allow_attach(struct cgroup *cgrp, struct cgroup_taskset *tset)
 {
 	struct cgroup_subsys *ss;
@@ -2159,7 +2159,7 @@ static int cgroup_allow_attach(struct cgroup *cgrp, struct cgroup_taskset *tset)
 
 	return 0;
 }
-#endif /* CONFIG_ZRAM_FOR_ANDROID */
+
 /*
  * Find the task_struct of the task to attach by vpid and pass it along to the
  * function to attach either it or all tasks in its threadgroup. Will lock
@@ -2168,9 +2168,7 @@ static int cgroup_allow_attach(struct cgroup *cgrp, struct cgroup_taskset *tset)
 static int attach_task_by_pid(struct cgroup *cgrp, u64 pid, bool threadgroup)
 {
 	struct task_struct *tsk;
-#ifndef CONFIG_ZRAM_FOR_ANDROID
 	const struct cred *cred = current_cred(), *tcred;
-#endif /* CONFIG_ZRAM_FOR_ANDROID */
 	int ret;
 
 	if (!cgroup_lock_live_group(cgrp))
@@ -2185,7 +2183,7 @@ retry_find_task:
 			ret= -ESRCH;
 			goto out_unlock_cgroup;
 		}
-#ifndef CONFIG_ZRAM_FOR_ANDROID
+
 		/*
 		 * even if we're attaching all tasks in the thread group, we
 		 * only need to check permissions on one of them.
@@ -2207,7 +2205,6 @@ retry_find_task:
 				goto out_unlock_cgroup;
 			}
 		}
-#endif /* CONFIG_ZRAM_FOR_ANDROID */
 	} else
 		tsk = current;
 
@@ -4906,7 +4903,7 @@ EXPORT_SYMBOL_GPL(css_depth);
  * @root: the css supporsed to be an ancestor of the child.
  *
  * Returns true if "root" is an ancestor of "child" in its hierarchy. Because
- * this function reads css->id, the caller must hold rcu_read_lock().
+ * this function reads css->id, this use rcu_dereference() and rcu_read_lock().
  * But, considering usual usage, the csses should be valid objects after test.
  * Assuming that the caller will do some action to the child if this returns
  * returns true, the caller must take "child";s reference count.
@@ -4918,18 +4915,18 @@ bool css_is_ancestor(struct cgroup_subsys_state *child,
 {
 	struct css_id *child_id;
 	struct css_id *root_id;
+	bool ret = true;
 
+	rcu_read_lock();
 	child_id  = rcu_dereference(child->id);
-	if (!child_id)
-		return false;
 	root_id = rcu_dereference(root->id);
-	if (!root_id)
-		return false;
-	if (child_id->depth < root_id->depth)
-		return false;
-	if (child_id->stack[root_id->depth] != root_id->id)
-		return false;
-	return true;
+	if (!child_id
+	    || !root_id
+	    || (child_id->depth < root_id->depth)
+	    || (child_id->stack[root_id->depth] != root_id->id))
+		ret = false;
+	rcu_read_unlock();
+	return ret;
 }
 
 void free_css_id(struct cgroup_subsys *ss, struct cgroup_subsys_state *css)

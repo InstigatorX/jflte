@@ -2060,7 +2060,7 @@ static void destroy_cfs_bandwidth(struct cfs_bandwidth *cfs_b)
 	hrtimer_cancel(&cfs_b->slack_timer);
 }
 
-static void unthrottle_offline_cfs_rqs(struct rq *rq)
+void unthrottle_offline_cfs_rqs(struct rq *rq)
 {
 	struct cfs_rq *cfs_rq;
 
@@ -2114,7 +2114,7 @@ static inline struct cfs_bandwidth *tg_cfs_bandwidth(struct task_group *tg)
 	return NULL;
 }
 static inline void destroy_cfs_bandwidth(struct cfs_bandwidth *cfs_b) {}
-static inline void unthrottle_offline_cfs_rqs(struct rq *rq) {}
+void unthrottle_offline_cfs_rqs(struct rq *rq) {}
 
 #endif /* CONFIG_CFS_BANDWIDTH */
 
@@ -2130,7 +2130,7 @@ static void hrtick_start_fair(struct rq *rq, struct task_struct *p)
 
 	WARN_ON(task_rq(p) != rq);
 
-	if (rq->cfs.h_nr_running > 1) {
+	if (cfs_rq->nr_running > 1) {
 		u64 slice = sched_slice(cfs_rq, se);
 		u64 ran = se->sum_exec_runtime - se->prev_sum_exec_runtime;
 		s64 delta = slice - ran;
@@ -2154,7 +2154,8 @@ static void hrtick_start_fair(struct rq *rq, struct task_struct *p)
 
 /*
  * called from enqueue/dequeue and updates the hrtick when the
- * current task is from our class.
+ * current task is from our class and nr_running is low enough
+ * to matter.
  */
 static void hrtick_update(struct rq *rq)
 {
@@ -2163,7 +2164,8 @@ static void hrtick_update(struct rq *rq)
 	if (!hrtick_enabled(rq) || curr->sched_class != &fair_sched_class)
 		return;
 
-	hrtick_start_fair(rq, curr);
+	if (cfs_rq_of(&curr->se)->nr_running < sched_nr_latency)
+		hrtick_start_fair(rq, curr);
 }
 #else /* !CONFIG_SCHED_HRTICK */
 static inline void
@@ -2640,18 +2642,25 @@ find_idlest_cpu(struct sched_group *group, struct task_struct *p, int this_cpu)
  */
 static int select_idle_sibling(struct task_struct *p, int target)
 {
+	int cpu = smp_processor_id();
+	int prev_cpu = task_cpu(p);
 	struct sched_domain *sd;
 	struct sched_group *sg;
-	int i = task_cpu(p);
-
-	if (idle_cpu(target))
-		return target;
+	int i;
 
 	/*
-	 * If the prevous cpu is cache affine and idle, don't be stupid.
+	 * If the task is going to be woken-up on this cpu and if it is
+	 * already idle, then it is the right target.
 	 */
-	if (i != target && cpus_share_cache(i, target) && idle_cpu(i))
-		return i;
+	if (target == cpu && idle_cpu(cpu))
+		return cpu;
+
+	/*
+	 * If the task is going to be woken-up on the cpu where it previously
+	 * ran and if it is currently idle, then it the right target.
+	 */
+	if (target == prev_cpu && idle_cpu(prev_cpu))
+		return prev_cpu;
 
 	if (!sysctl_sched_wake_to_idle &&
 	    !(current->flags & PF_WAKE_UP_IDLE) &&
@@ -2670,7 +2679,7 @@ static int select_idle_sibling(struct task_struct *p, int target)
 				goto next;
 
 			for_each_cpu(i, sched_group_cpus(sg)) {
-				if (i == target || !idle_cpu(i))
+				if (!idle_cpu(i))
 					goto next;
 			}
 
@@ -3094,8 +3103,6 @@ struct lb_env {
 	unsigned int		loop_max;
 };
 
-static DEFINE_PER_CPU(bool, dbs_boost_needed);
-
 /*
  * move_task - move a task from one runqueue to another runqueue.
  * Both runqueues must be locked.
@@ -3106,8 +3113,6 @@ static void move_task(struct task_struct *p, struct lb_env *env)
 	set_task_cpu(p, env->dst_cpu);
 	activate_task(env->dst_rq, p, 0);
 	check_preempt_curr(env->dst_rq, p, 0);
-	if (task_notify_on_migrate(p))
-		per_cpu(dbs_boost_needed, env->dst_cpu) = true;
 }
 
 /*
@@ -3794,7 +3799,7 @@ static inline void update_sg_lb_stats(struct sched_domain *sd,
 			int local_group, const struct cpumask *cpus,
 			int *balance, struct sg_lb_stats *sgs)
 {
-	unsigned long scaled_load, load, max_cpu_load, min_cpu_load, max_nr_running;
+	unsigned long load, max_cpu_load, min_cpu_load, max_nr_running;
 	int i;
 	unsigned int balance_cpu = -1, first_idle_cpu = 0;
 	unsigned long avg_load_per_task = 0;
@@ -3820,14 +3825,12 @@ static inline void update_sg_lb_stats(struct sched_domain *sd,
 			load = target_load(i, load_idx);
 		} else {
 			load = source_load(i, load_idx);
-			scaled_load = load * SCHED_POWER_SCALE
-					/ cpu_rq(i)->cpu_power;
-			if (scaled_load > max_cpu_load) {
-				max_cpu_load = scaled_load;
+			if (load > max_cpu_load) {
+				max_cpu_load = load;
 				max_nr_running = rq->nr_running;
 			}
-			if (min_cpu_load > scaled_load)
-				min_cpu_load = scaled_load;
+			if (min_cpu_load > load)
+				min_cpu_load = load;
 		}
 
 		sgs->group_load += load;
@@ -3866,11 +3869,8 @@ static inline void update_sg_lb_stats(struct sched_domain *sd,
 	 *      normalized nr_running number somewhere that negates
 	 *      the hierarchy?
 	 */
-	if (sgs->sum_nr_running) {
-		avg_load_per_task = sgs->sum_weighted_load * SCHED_POWER_SCALE
-					/ group->sgp->power;
-		avg_load_per_task /= sgs->sum_nr_running;
-	}
+	if (sgs->sum_nr_running)
+		avg_load_per_task = sgs->sum_weighted_load / sgs->sum_nr_running;
 
 	if ((max_cpu_load - min_cpu_load) >= avg_load_per_task && max_nr_running > 1)
 		sgs->group_imb = 1;
@@ -4062,7 +4062,7 @@ static inline void fix_small_imbalance(struct sd_lb_stats *sds,
 {
 	unsigned long tmp, pwr_now = 0, pwr_move = 0;
 	unsigned int imbn = 2;
-	unsigned long scaled_busy_load_per_task, scaled_this_load_per_task;
+	unsigned long scaled_busy_load_per_task;
 
 	if (sds->this_nr_running) {
 		sds->this_load_per_task /= sds->this_nr_running;
@@ -4083,9 +4083,6 @@ static inline void fix_small_imbalance(struct sd_lb_stats *sds,
 		return;
 	}
 
-	scaled_this_load_per_task = sds->this_load_per_task
-					 * SCHED_POWER_SCALE;
-	scaled_this_load_per_task /= sds->this->sgp->power;
 	/*
 	 * OK, we don't have enough imbalance to justify moving tasks,
 	 * however we may be able to increase total CPU power used by
@@ -4093,35 +4090,31 @@ static inline void fix_small_imbalance(struct sd_lb_stats *sds,
 	 */
 
 	pwr_now += sds->busiest->sgp->power *
-			min(scaled_busy_load_per_task, sds->max_load);
+			min(sds->busiest_load_per_task, sds->max_load);
 	pwr_now += sds->this->sgp->power *
-			min(scaled_this_load_per_task, sds->this_load);
+			min(sds->this_load_per_task, sds->this_load);
 	pwr_now /= SCHED_POWER_SCALE;
 
 	/* Amount of load we'd subtract */
-	if (sds->max_load > scaled_busy_load_per_task) {
+	tmp = (sds->busiest_load_per_task * SCHED_POWER_SCALE) /
+		sds->busiest->sgp->power;
+	if (sds->max_load > tmp)
 		pwr_move += sds->busiest->sgp->power *
-			min(scaled_busy_load_per_task,
-				sds->max_load - scaled_busy_load_per_task);
-		tmp = scaled_busy_load_per_task;
-	} else
-		tmp = sds->max_load;
+			min(sds->busiest_load_per_task, sds->max_load - tmp);
 
-	/* Scale to this queue from busiest queue */
-	tmp = (tmp * sds->busiest->sgp->power) /
-		sds->this->sgp->power;
 	/* Amount of load we'd add */
+	if (sds->max_load * sds->busiest->sgp->power <
+		sds->busiest_load_per_task * SCHED_POWER_SCALE)
+		tmp = (sds->max_load * sds->busiest->sgp->power) /
+			sds->this->sgp->power;
+	else
+		tmp = (sds->busiest_load_per_task * SCHED_POWER_SCALE) /
+			sds->this->sgp->power;
 	pwr_move += sds->this->sgp->power *
-			min(scaled_this_load_per_task, sds->this_load + tmp);
+			min(sds->this_load_per_task, sds->this_load + tmp);
 	pwr_move /= SCHED_POWER_SCALE;
 
 	/* Move if we gain throughput */
-	/*
-	 * The only possibilty for below statement be true, is:
-	 * sds->max_load is larger than scaled_busy_load_per_task, while,
-	 * scaled_this_load_per_task is larger than sds->this_load plus by
-	 * the scaled scaled_busy_load_per_task moved into this queue
-	 */
 	if (pwr_move > pwr_now)
 		*imbalance = sds->busiest_load_per_task;
 }
@@ -4557,15 +4550,9 @@ more_balance:
 			 */
 			sd->nr_balance_failed = sd->cache_nice_tries+1;
 		}
-	} else {
+	} else
 		sd->nr_balance_failed = 0;
-		if (per_cpu(dbs_boost_needed, this_cpu)) {
-			per_cpu(dbs_boost_needed, this_cpu) = false;
-			atomic_notifier_call_chain(&migration_notifier_head,
-						   this_cpu,
-						   (void *)cpu_of(busiest));
-		}
-	}
+
 	if (likely(!active_balance)) {
 		/* We were unbalanced, so reset the balancing interval */
 		sd->balance_interval = sd->min_interval;
@@ -4720,12 +4707,6 @@ static int active_load_balance_cpu_stop(void *data)
 out_unlock:
 	busiest_rq->active_balance = 0;
 	raw_spin_unlock_irq(&busiest_rq->lock);
-	if (per_cpu(dbs_boost_needed, target_cpu)) {
-		per_cpu(dbs_boost_needed, target_cpu) = false;
-		atomic_notifier_call_chain(&migration_notifier_head,
-					   target_cpu,
-					   (void *)cpu_of(busiest_rq));
-	}
 	return 0;
 }
 
@@ -5191,9 +5172,6 @@ static void rq_online_fair(struct rq *rq)
 static void rq_offline_fair(struct rq *rq)
 {
 	update_sysctl();
-
-	/* Ensure any throttled groups are reachable by pick_next_task */
-	unthrottle_offline_cfs_rqs(rq);
 }
 
 #endif /* CONFIG_SMP */

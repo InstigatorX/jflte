@@ -346,11 +346,8 @@ static inline unsigned int cpufreq_quick_get_max(unsigned int cpu)
 #endif
 
 #ifdef CONFIG_SEC_DVFS
-enum {	
-	BOOT_CPU = 0,	
-	NON_BOOT_CPU1,
-	NON_BOOT_CPU2,
-	NON_BOOT_CPU3,
+enum {
+	BOOT_CPU = 0,
 };
 
 int get_max_freq(void);
@@ -359,8 +356,8 @@ int get_min_freq(void);
 #define MAX_FREQ_LIMIT		get_max_freq() /* 1512000 */
 #define MIN_FREQ_LIMIT		get_min_freq() /* 384000 */
 
-#define MIN_TOUCH_LIMIT		1674000
-#define MIN_TOUCH_LIMIT_SECOND	1350000
+#define MIN_TOUCH_LIMIT		1134000
+#define MIN_TOUCH_LIMIT_SECOND	810000
 
 #ifdef CONFIG_TARGET_SERIES_DALI
 #define MAX_UNICPU_LIMIT	1188000
@@ -424,9 +421,6 @@ extern struct cpufreq_governor cpufreq_gov_conservative;
 #elif defined(CONFIG_CPU_FREQ_DEFAULT_GOV_INTERACTIVE)
 extern struct cpufreq_governor cpufreq_gov_interactive;
 #define CPUFREQ_DEFAULT_GOVERNOR	(&cpufreq_gov_interactive)
-#elif defined(CONFIG_CPU_FREQ_DEFAULT_GOV_INTELLIDEMAND)
-extern struct cpufreq_governor cpufreq_gov_intellidemand;
-#define CPUFREQ_DEFAULT_GOVERNOR        (&cpufreq_gov_intellidemand)
 #endif
 
 

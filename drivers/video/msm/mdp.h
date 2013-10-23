@@ -733,7 +733,6 @@ extern struct mdp_hist_mgmt *mdp_hist_mgmt_array[];
 
 void mdp_hw_init(void);
 int mdp_ppp_pipe_wait(void);
-void mdp_pipe_kickoff_simplified(uint32 term);
 void mdp_pipe_kickoff(uint32 term, struct msm_fb_data_type *mfd);
 void mdp_clk_ctrl(int on);
 void mdp_pipe_ctrl(MDP_BLOCK_TYPE block, MDP_BLOCK_POWER_STATE state,
@@ -836,15 +835,18 @@ unsigned long mdp_get_core_clk(void);
 
 #ifdef CONFIG_MSM_BUS_SCALING
 int mdp_bus_scale_update_request(u64 ab_p0, u64 ib_p0, u64 ab_p1, u64 ib_p1);
+
+int mdp_bus_scale_restore_request(void);
 #else
 static inline int mdp_bus_scale_update_request(u64 ab_p0,
-					       u64 ib_p0,
-					       u64 ab_p1,
-					       u64 ib_p1)
-{
-	return 0;
-}
+                                              u64 ib_p0,
+                                              u64 ab_p1,
+                                              u64 ib_p1)
+ {
+        return 0;
+ }
 
+ 
 static int mdp_bus_scale_restore_request(void) 
 { 
  return 0; 
@@ -884,7 +886,7 @@ void mdp_histogram_handle_isr(struct mdp_hist_mgmt *mgmt);
 void __mdp_histogram_kickoff(struct mdp_hist_mgmt *mgmt);
 void __mdp_histogram_reset(struct mdp_hist_mgmt *mgmt);
 void mdp_footswitch_ctrl(boolean on);
-int mdp_enable_iommu_clocks(void);
+int mdp_enable_iommu_clocks(void); 
 int mdp_disable_iommu_clocks(void);
 
 #ifdef CONFIG_FB_MSM_MDP303

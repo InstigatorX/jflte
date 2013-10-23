@@ -1,7 +1,9 @@
 config ZRAM
 	tristate "Compressed RAM block device support"
-	depends on BLOCK && SYSFS && ZSMALLOC && CRYPTO=y
-	select CRYPTO_LZO
+	depends on BLOCK && SYSFS
+	select ZSMALLOC
+	select LZO_COMPRESS
+	select LZO_DECOMPRESS
 	default n
 	help
 	  Creates virtual block devices called /dev/zramX (X = 0, 1, ...).
@@ -13,7 +15,7 @@ config ZRAM
 	  disks and maybe many more.
 
 	  See zram.txt for more information.
-	  Project home: <https://compcache.googlecode.com/>
+	  Project home: http://compcache.googlecode.com/
 
 config ZRAM_DEBUG
 	bool "Compressed RAM block device debug support"
@@ -24,9 +26,8 @@ config ZRAM_DEBUG
 	  RAM block device driver.
 
 config ZRAM_FOR_ANDROID
-        bool "Optimize zram behavior for android"
-        depends on ZRAM && ANDROID
-        default n
-        help
-          This option enables modified zram behavior optimized for android
-
+	bool "Optimize zram behavior for android"
+	depends on ZRAM && ANDROID
+	default n
+	help
+	  This option enables modified zram behavior optimized for android

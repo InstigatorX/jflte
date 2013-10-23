@@ -165,8 +165,13 @@ static struct synaptics_rmi_f1a_button_map tm1940_f1a_button_map = {
 #define SYNAPTICS_MAX_X_SIZE	1079
 #define SYNAPTICS_MAX_Y_SIZE	1919
 #define SYNAPTICS_MAX_WIDTH	SYNAPTICS_MAX_Y_SIZE
+#if defined(CONFIG_MACH_JACTIVE_EUR)
+#define NUM_RX	16
+#define NUM_TX	28
+#else
 #define NUM_RX	28
 #define NUM_TX	16
+#endif
 
 static struct synaptics_rmi4_platform_data rmi4_platformdata = {
 	/*.irq_type = IRQF_TRIGGER_FALLING,*/
@@ -246,7 +251,7 @@ void __init S5000_tsp_input_init(int version)
 	el_type = (version >> 8) & 0x1;
 
 #if defined(CONFIG_MACH_JACTIVE_EUR) || defined(CONFIG_MACH_JACTIVE_ATT)
-	/* JACITVE USE ONLY B Type */
+	/* JACITVE USE ONLY B Type */ 
 	touch_sleep_time = SYNAPTICS_HW_RESET_TIME_B0;
 #else
 	/* IF TSP IS is A1, B0 version : ID2 value is 40
@@ -257,6 +262,7 @@ void __init S5000_tsp_input_init(int version)
 	else
 		touch_sleep_time = SYNAPTICS_HW_RESET_TIME;
 #endif
+
 	if (touch_type < 5) {
 		if (el_type)
 			rmi4_platformdata.panel_revision = OCTA_PANEL_REVISION_40;

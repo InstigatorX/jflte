@@ -86,12 +86,6 @@ void enable_hlt(void)
 
 EXPORT_SYMBOL(enable_hlt);
 
-int get_hlt(void)
-{
-	return hlt_counter;
-}
-EXPORT_SYMBOL(get_hlt);
-
 static int __init nohlt_setup(char *__unused)
 {
 	hlt_counter = 1;
@@ -242,9 +236,6 @@ static void default_idle(void)
 void (*pm_idle)(void) = default_idle;
 EXPORT_SYMBOL(pm_idle);
 
-#ifdef CONFIG_ZRAM_FOR_ANDROID
-extern void could_cswap(void);
-#endif /* CONFIG_ZRAM_FOR_ANDROID */
 
 /*
  * The idle thread, has rather strange semantics for calling pm_idle,
@@ -262,11 +253,10 @@ void cpu_idle(void)
 		tick_nohz_idle_enter();
 		rcu_idle_enter();
 		while (!need_resched()) {
-
-#ifdef CONFIG_ZRAM_FOR_ANDROID
-			could_cswap();
-#endif /* CONFIG_ZRAM_FOR_ANDROID */
-
+#ifdef CONFIG_HOTPLUG_CPU
+			if (cpu_is_offline(smp_processor_id()))
+				cpu_die();
+#endif
 			/*
 			 * We need to disable interrupts here
 			 * to ensure we don't miss a wakeup call.
@@ -295,10 +285,6 @@ void cpu_idle(void)
 		tick_nohz_idle_exit();
 		idle_notifier_call_chain(IDLE_END);
 		schedule_preempt_disabled();
-#ifdef CONFIG_HOTPLUG_CPU
-		if (cpu_is_offline(smp_processor_id()))
-			cpu_die();
-#endif
 	}
 }
 
@@ -723,11 +709,6 @@ int in_gate_area_no_mm(unsigned long addr)
 
 const char *arch_vma_name(struct vm_area_struct *vma)
 {
-	if (vma == &gate_vma)
-		return "[vectors]";
-	else if (vma == get_user_timers_vma(NULL))
-		return "[timers]";
-	else
-		return NULL;
+	return (vma == &gate_vma) ? "[vectors]" : NULL;
 }
 #endif
