@@ -6,6 +6,8 @@ assert(
     package_extract_dir("system", "/system")
 );
 set_perm(0, 0, 0755, "/system/bin/loki.sh");
+set_perm(0, 0, 0755, "/system/bin/loki_flash");
+set_perm(0, 0, 0755, "/system/bin/loki_patch");
 assert(run_program("/system/bin/loki.sh") == 0);
 delete("/system/bin/loki.sh");
 delete("/system/etc/loki_bootloaders");
