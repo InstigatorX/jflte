@@ -83,12 +83,6 @@ struct msm_pm_platform_data {
 
 extern struct msm_pm_platform_data msm_pm_sleep_modes[];
 
-struct msm_pm_sleep_status_data {
-	void *base_addr;
-	uint32_t cpu_offset;
-	uint32_t mask;
-};
-
 struct msm_pm_sleep_ops {
 	void *(*lowest_limits)(bool from_idle,
 			enum msm_pm_sleep_mode sleep_mode,
