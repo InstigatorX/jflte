@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# Copyright (c) 2012, The Linux Foundation. All rights reserved.
+# Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -26,58 +26,35 @@
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-target="$1"
-serial="$2"
-
-# No path is set up at this point so we have to do it here.
-PATH=/sbin:/system/sbin:/system/bin:/system/xbin
-export PATH
-
-mount_needed=false;
-
-if [ ! -f /system/etc/boot_fixup ];then
-# This should be the first command
-# remount system as read-write.
-  mount -o rw,remount,barrier=1 /system
-  mount_needed=true;
+#
+# start two rild when dsds property enabled
+#
+dsds=`getprop persist.multisim.config`
+if [ "$dsds" = "dsds" ]; then
+    setprop ro.multi.rild true
+    stop ril-daemon
+    start ril-daemon
+    start ril-daemon1
 fi
 
-# **** WARNING *****
-# This runs in a single-threaded, critical path portion
-# of the Android bootup sequence.  This is to guarantee
-# all necessary system partition fixups are done before
-# the rest of the system starts up.  Run any non-
-# timing critical tasks in a separate process to
-# prevent slowdown at boot.
-
-# Run modem link script
-if [ -f /system/etc/init.qcom.modem_links.sh ]; then
-  /system/bin/sh /system/etc/init.qcom.modem_links.sh
-fi
-
-# Run mdm link script
-if [ -f /system/etc/init.qcom.mdm_links.sh ]; then
-  /system/bin/sh /system/etc/init.qcom.mdm_links.sh
-fi
-
-# Run thermal script
-if [ -f /system/etc/init.qcom.thermal_conf.sh ]; then
-  /system/bin/sh /system/etc/init.qcom.thermal_conf.sh
-fi
-
-# Run wifi script
-if [ -f /system/etc/init.qcom.wifi.sh ]; then
-  /system/bin/sh /system/etc/init.qcom.wifi.sh "$target" "$serial"
-fi
-
-# Run the sensor script
-if [ -f /system/etc/init.qcom.sensor.sh ]; then
-  /system/bin/sh /system/etc/init.qcom.sensor.sh
-fi
-
-# This should be the last command
-# remount system as read-only.
-  mount -o ro,remount,barrier=1 /system
-
-
-
+    #To allow interfaces to get v6 address when tethering is enabled
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet0/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet1/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet2/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet3/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet4/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet5/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet6/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet7/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet_sdio0/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet_sdio1/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet_sdio2/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet_sdio3/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet_sdio4/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet_sdio5/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet_sdio6/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet_sdio7/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet_usb0/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet_usb1/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet_usb2/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet_usb3/accept_ra
