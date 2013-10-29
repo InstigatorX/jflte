@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# Copyright (c) 2012, The Linux Foundation. All rights reserved.
+# Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -27,35 +27,34 @@
 #
 
 #
-# start ril-daemon only for targets on which radio is present
+# start two rild when dsds property enabled
 #
-baseband=`getprop ro.baseband`
-multirild=`getprop ro.multi.rild`
-dsds=`getprop persist.dsds.enabled`
-netmgr=`getprop ro.use_data_netmgrd`
-
-case "$baseband" in
-    "apq")
-    setprop ro.radio.noril yes
+dsds=`getprop persist.multisim.config`
+if [ "$dsds" = "dsds" ]; then
+    setprop ro.multi.rild true
     stop ril-daemon
-esac
+    start ril-daemon
+    start ril-daemon1
+fi
 
-case "$baseband" in
-    "msm" | "csfb" | "svlte2a" | "mdm" | "sglte" | "unknown")
-    start qmuxd
-    case "$baseband" in
-        "svlte2a" | "csfb" | "sglte")
-        start qmiproxy
-    esac
-    case "$multirild" in
-        "true")
-         case "$dsds" in
-             "true")
-             start ril-daemon1
-         esac
-    esac
-    case "$netmgr" in
-        "true")
-        start netmgrd
-    esac
-esac
+    #To allow interfaces to get v6 address when tethering is enabled
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet0/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet1/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet2/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet3/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet4/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet5/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet6/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet7/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet_sdio0/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet_sdio1/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet_sdio2/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet_sdio3/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet_sdio4/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet_sdio5/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet_sdio6/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet_sdio7/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet_usb0/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet_usb1/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet_usb2/accept_ra
+    echo 2 > /proc/sys/net/ipv6/conf/rmnet_usb3/accept_ra
