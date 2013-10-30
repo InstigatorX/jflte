@@ -244,20 +244,20 @@ service usf-post-boot /system/bin/sh /system/etc/usf_post_boot.sh
     disabled
     oneshot
 
-service prepare-mobicore /system/bin/sh /system/bin/mobicore-presetup.sh
-    class core
-    user root
-    group root
-    oneshot
+#service prepare-mobicore /system/bin/sh /system/bin/mobicore-presetup.sh
+#    class core
+#    user root
+#    group root
+#    oneshot
 
-service run-mobicore /system/bin/sh /system/bin/mobicore-startup.sh
-    class core
-    user system
-    group system
+#service run-mobicore /system/bin/sh /system/bin/mobicore-startup.sh
+#    class core
+#    user system
+#    group system
 
 on property:init.svc.bootanim=stopped
     start usf-post-boot
-    start run-mobicore
+#    start run-mobicore
     start efsrestorecon
 
 service time_daemon /system/bin/time_daemon
