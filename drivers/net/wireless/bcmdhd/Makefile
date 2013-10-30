@@ -267,7 +267,7 @@ ifneq ($(CONFIG_ARCH_EXYNOS),y)
 EXTRA_LDFLAGS += --strip-debug
 endif
 
-EXTRA_CFLAGS += $(DHDCFLAGS) -DDHD_DEBUG
+EXTRA_CFLAGS += $(DHDCFLAGS) -DDHD_DEBUG -fno-pic
 EXTRA_CFLAGS += -DSRCBASE=\"$(src)\"
 EXTRA_CFLAGS += -I$(src)/include/ -I$(src)/
 KBUILD_CFLAGS += -I$(LINUXDIR)/include -I$(shell pwd)
