@@ -2924,7 +2924,7 @@ static int __devinit sec_battery_probe(struct platform_device *pdev)
 
 	/* create work queue */
 	battery->monitor_wqueue =
-	    create_singlethread_workqueue(dev_name(&pdev->dev));
+		alloc_workqueue(dev_name(&pdev->dev), WQ_FREEZABLE, 1);
 	if (!battery->monitor_wqueue) {
 		dev_err(battery->dev,
 			"%s: Fail to Create Workqueue\n", __func__);
