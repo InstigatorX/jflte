@@ -1,15 +1,31 @@
-assert(getprop("ro.product.device") == "jflteatt" || getprop("ro.build.product") == "jflteatt");
+assert(getprop("ro.product.device") == "jflteatt" || getprop("ro.build.product") == "jflteatt" || getprop("ro.product.device") == "jfltecan" || getprop("ro.build.product") == "jfltecan");
 mount("ext4", "EMMC", "/dev/block/platform/msm_sdcc.1/by-name/system", "/system");
 package_extract_file("boot.img", "/tmp/boot.img");
+
 assert(
     delete_recursive("/system/lib/modules"),
     package_extract_dir("system", "/system")
 );
-set_perm(0, 0, 0755, "/system/bin/loki.sh");
-set_perm(0, 0, 0755, "/system/bin/loki_flash");
-set_perm(0, 0, 0755, "/system/bin/loki_patch");
-assert(run_program("/system/bin/loki.sh") == 0);
-delete("/system/bin/loki.sh");
-delete("/system/etc/loki_bootloaders");
-delete("/system/etc/unlocked_bootloaders");
+
+ifelse
+(
+  (getprop("ro.product.device") == "jflteatt" || getprop("ro.build.product") == "jflteatt"),
+  (
+    ui_print("ATT Phone detected...Applying Loki!");
+    package_extract_dir("loki", "/tmp");
+    set_perm(0, 0, 0755, "/tmp/loki.sh");
+	set_perm(0, 0, 0755, "/tmp/loki_flash");
+	set_perm(0, 0, 0755, "/tmp/loki_patch");
+	assert(
+		run_program("/tmp/loki.sh"),
+		delete("/tmp/loki.sh"),
+		delete("/tmp/loki_bootloaders"),
+		delete("/tmp/unlocked_bootloaders")
+	);
+  ),
+  (
+    ui_print("Non-ATT Phone Detected...Loki NOT applied!");
+  )
+);
+
 unmount("/system");
