@@ -249,8 +249,7 @@ struct mmc_part {
 /**
  * struct mmc_bkops_info - BKOPS data
  * @dw:	Idle time bkops delayed work
- * @host_suspend_tout_ms:	The host controller idle time,
- * before getting into suspend
+ * @host_delay_ms:	The host controller time to start bkops
  * @delay_ms:	The time to start the BKOPS
  *        delayed work once MMC thread is idle
  * @cancel_delayed_work: A flag to indicate if the delayed work
@@ -260,14 +259,14 @@ struct mmc_part {
  */
 struct mmc_bkops_info {
 	struct delayed_work	dw;
-	unsigned int		host_suspend_tout_ms;
+	unsigned int        host_delay_ms;
 	unsigned int		delay_ms;
 	unsigned int		min_sectors_to_queue_delayed_work;
 /*
  * A default time for checking the need for non urgent BKOPS once mmcqd
  * is idle.
  */
-#define MMC_IDLE_BKOPS_TIME_MS 2000
+#define MMC_IDLE_BKOPS_TIME_MS 200
 	bool			cancel_delayed_work;
 	unsigned int		sectors_changed;
 /*
