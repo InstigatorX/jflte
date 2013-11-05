@@ -346,11 +346,8 @@ static inline unsigned int cpufreq_quick_get_max(unsigned int cpu)
 #endif
 
 #ifdef CONFIG_SEC_DVFS
-enum {	
-	BOOT_CPU = 0,	
-	NON_BOOT_CPU1,
-	NON_BOOT_CPU2,
-	NON_BOOT_CPU3,
+enum {
+	BOOT_CPU = 0,
 };
 
 int get_max_freq(void);
