@@ -52,16 +52,6 @@
 #define DEBUG 0
 
 #define CPUS_AVAILABLE		num_possible_cpus()
-/*
- * SAMPLING_PERIODS * MIN_SAMPLING_RATE is the minimum
- * load history which will be averaged
- */
-#define SAMPLING_PERIODS	10
-#define INDEX_MAX_VALUE		(SAMPLING_PERIODS - 1)
-/*
- * MIN_SAMPLING_RATE is scaled based on num_online_cpus()
- */
-#define MIN_SAMPLING_RATE	100
 
 /*
  * Load defines:
@@ -72,20 +62,26 @@
  * These two are scaled based on num_online_cpus()
  */
 #define ENABLE_ALL_LOAD_THRESHOLD	600
-#define ENABLE_LOAD_THRESHOLD		275
-#define DISABLE_LOAD_THRESHOLD		125
+#define ENABLE_LOAD_THRESHOLD		200
+#define DISABLE_LOAD_THRESHOLD		70
+
+#define ONLINE_SAMPLING_PERIODS		3
+#define OFFLINE_SAMPLING_PERIODS	5
+#define SAMPLING_RATE				100
 
 struct delayed_work hotplug_decision_work;
 
 static struct workqueue_struct *ixwq;
 
-static unsigned int history[SAMPLING_PERIODS];
-static unsigned int index;
-
 static unsigned int enable_all_load = ENABLE_ALL_LOAD_THRESHOLD;
 static unsigned int enable_load = ENABLE_LOAD_THRESHOLD;
 static unsigned int disable_load = DISABLE_LOAD_THRESHOLD;
-static unsigned int sampling_rate = MIN_SAMPLING_RATE;
+static unsigned int sampling_rate = SAMPLING_RATE;
+
+static unsigned int online_sample = 1;
+static unsigned int offline_sample = 1;
+static unsigned int online_sampling_periods = ONLINE_SAMPLING_PERIODS;
+static unsigned int offline_sampling_periods = OFFLINE_SAMPLING_PERIODS;
 
 static void hotplug_online_single_work(void)
 {
@@ -130,86 +126,36 @@ static void hotplug_offline_work(void)
 
 static void hotplug_decision_work_fn(struct work_struct *work)
 {
-	unsigned int running, cur_disable_load, cur_enable_load;
-	unsigned int avg_running = 0, online_cpus, available_cpus, i, j;
-#if DEBUG
-	unsigned int k;
-#endif
+	unsigned int online_cpus, available_cpus;
+	unsigned int avg_running, io_wait;
 
 	online_cpus = num_online_cpus();
 	available_cpus = CPUS_AVAILABLE;
-	cur_disable_load = disable_load * online_cpus;
-	cur_enable_load = enable_load * online_cpus;
 
-	/*
-	 * Multiply nr_running() by 100 so we don't have to
-	 * use fp division to get the average.
-	 */
-	running = nr_running() * 100;
-
-	history[index] = running;
-
-#if DEBUG
-	pr_info("online_cpus is: %d\n", online_cpus);
-	pr_info("cur_enable_load is: %d\n", cur_enable_load);
-	pr_info("cur_disable_load is: %d\n", cur_disable_load);
-	pr_info("index is: %d\n", index);
-	pr_info("running is: %d\n", running);
-#endif
-
-	/*
-	 * Use a circular buffer to calculate the average load
-	 * over the sampling periods.
-	 * This will absorb load spikes of short duration where
-	 * we don't want additional cores to be onlined because
-	 * the cpufreq driver should take care of those load spikes.
-	 */
-	for (i = 0, j = index; i < SAMPLING_PERIODS; i++, j--) {
-		avg_running += history[j];
-		if (unlikely(j == 0))
-			j = INDEX_MAX_VALUE;
-	}
-
-	/*
-	 * If we are at the end of the buffer, return to the beginning.
-	 */
-	if (unlikely(index++ == INDEX_MAX_VALUE))
-		index = 0;
-
-#if DEBUG
-	pr_info("array contents: ");
-	for (k = 0; k < SAMPLING_PERIODS; k++) {
-		 pr_info("%d: %d\t",k, history[k]);
-	}
-	pr_info("\n");
-	pr_info("avg_running before division: %d\n", avg_running);
-#endif
-
-	avg_running = avg_running / SAMPLING_PERIODS;
-
-#if DEBUG
-	pr_info("average_running is: %d\n", avg_running);
-#endif
-
+	sched_get_nr_running_avg(&avg_running, &io_wait);
+	
 	if (unlikely((avg_running >= enable_all_load) && (online_cpus < available_cpus))) {
 		pr_info("auto_hotplug: Onlining all CPUs, avg running: %d\n", avg_running);
 		hotplug_online_all_work();
-	} else if ((avg_running >= cur_enable_load) && (online_cpus < available_cpus)) {
-		pr_info("auto_hotplug: Onlining single CPU, avg running: %d\n", avg_running);
-		hotplug_online_single_work();
-	} else if (avg_running <= cur_disable_load) {
-		pr_info("auto_hotplug: Offlining CPU, avg running: %d\n", avg_running);
-		hotplug_offline_work();
-		/* If boostpulse is active, clear the flags */
+	} else if ((avg_running >= enable_load) && (online_cpus < available_cpus)) {
+		if (online_sample >= online_sampling_periods) { 
+			pr_info("auto_hotplug: Onlining single CPU, avg running: %d\n", avg_running);
+			hotplug_online_single_work();
+			sampling_rate = 200;
+		} else {
+			online_sample++;
+		}
+		offline_sample = 1;
+	} else if (avg_running <= disable_load && (online_cpus > 1)) {
+		if (offline_sample >= offline_sampling_periods) {
+			pr_info("auto_hotplug: Offlining CPU, avg running: %d\n", avg_running);
+			hotplug_offline_work();
+			sampling_rate = 100;
+		} else {
+			offline_sample++;
+		}
+		online_sample = 1;
 	}
-
-	/*
-	 * Reduce the sampling rate dynamically based on online cpus.
-	 */
-
-#if DEBUG
-	pr_info("sampling_rate is: %dms\n", jiffies_to_msecs(sampling_rate));
-#endif
 
 	queue_delayed_work_on(0, ixwq, &hotplug_decision_work, msecs_to_jiffies(sampling_rate));
 }
@@ -234,7 +180,7 @@ static ssize_t store_enable_all_load(struct kobject *kobj,
 	return count;
 }
 
-static struct global_attr enable_all_load_attr = __ATTR(enable_all_load, 0644,
+static struct global_attr enable_all_load_attr = __ATTR(enable_all_load, 0666,
 		show_enable_all_load, store_enable_all_load);
 		
 static ssize_t show_enable_load(struct kobject *kobj,
@@ -257,7 +203,7 @@ static ssize_t store_enable_load(struct kobject *kobj,
 	return count;
 }
 
-static struct global_attr enable_load_attr = __ATTR(enable_load, 0644,
+static struct global_attr enable_load_attr = __ATTR(enable_load, 06666,
 		show_enable_load, store_enable_load);
 		
 static ssize_t show_disable_load(struct kobject *kobj,
@@ -280,37 +226,13 @@ static ssize_t store_disable_load(struct kobject *kobj,
 	return count;
 }
 
-static struct global_attr disable_load_attr = __ATTR(disable_load, 0644,
+static struct global_attr disable_load_attr = __ATTR(disable_load, 0666,
 		show_disable_load, store_disable_load);
-
-static ssize_t show_sampling_rate(struct kobject *kobj,
-				     struct attribute *attr, char *buf)
-{
-	return sprintf(buf, "%d\n", sampling_rate);
-}
-
-static ssize_t store_sampling_rate(struct kobject *kobj,
-				  struct attribute *attr, const char *buf,
-				  size_t count)
-{
-	int ret;
-	long unsigned int val;
-
-	ret = strict_strtoul(buf, 0, &val);
-	if (ret < 0)
-		return ret;
-	sampling_rate = val;
-	return count;
-}
-
-static struct global_attr sampling_rate_attr = __ATTR(sampling_rate, 0644,
-		show_sampling_rate, store_sampling_rate);
 
 static struct attribute *auto_hotplug_attributes[] = {
 	&enable_all_load_attr.attr,
 	&enable_load_attr.attr,
 	&disable_load_attr.attr,
-	&sampling_rate_attr.attr,
 	NULL,
 };
 
@@ -359,7 +281,7 @@ static int __init auto_hotplug_init(void)
 {
 	int rc;
 
-	int delay = usecs_to_jiffies(MIN_SAMPLING_RATE);
+	int delay = usecs_to_jiffies(sampling_rate);
 
 	pr_info("iX_auto_hotplug: based on v0.220 by _thalamus\n");
 	pr_info("iX_auto_hotplug: %d CPUs detected\n", CPUS_AVAILABLE);
