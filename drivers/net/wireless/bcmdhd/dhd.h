@@ -471,11 +471,11 @@ inline static void MUTEX_UNLOCK_SOFTAP_SET(dhd_pub_t * dhdp)
 #define DHD_OS_WAKE_LOCK_CTRL_TIMEOUT_ENABLE(pub, val) \
 	dhd_os_wake_lock_ctrl_timeout_enable(pub, val)
 #endif /* DHD_DEBUG_WAKE_LOCK */
-#define DHD_PACKET_TIMEOUT_MS	1000
+#define DHD_PACKET_TIMEOUT_MS	500
 #define DHD_EVENT_TIMEOUT_MS	1500
 
 #if defined(CUSTOMER_HW4) && defined(PNO_SUPPORT)
-#define DHD_PNO_TIMEOUT_MS	10000
+#define DHD_PNO_TIMEOUT_MS	3500
 #endif
 
 /* interface operations (register, remove) should be atomic, use this lock to prevent race
@@ -798,7 +798,9 @@ extern uint dhd_force_tx_queueing;
 #endif
 #endif /* RXFRAME_THREAD */
 
-#define MAX_DTIM_SKIP_BEACON_ITERVAL	100 /* max allowed associated AP beacon for dtim skip */
+#define MAX_DTIM_SKIP_BEACON_INTERVAL	100 /* max allowed associated AP beacon for dtim skip */
+#define MAX_DTIM_ALLOWED_INTERVAL 300 /* max allowed total beacon interval for DTIM skip */
+#define NO_DTIM_SKIP 1
 
 #ifdef SDTEST
 /* Echo packet generator (SDIO), pkts/s */
