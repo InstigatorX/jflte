@@ -135,6 +135,7 @@ static void hotplug_decision_work_fn(struct work_struct *work)
 			hotplug_online_single_work();
 			sampling_rate = 50 * online_cpus + 50;
 			online_sample = 1;
+			pr_info("ix_hotplug: Avg Running: %d Sample Rate: %d\n", avg_running, sampling_rate);
 		} else {
 			online_sample++;
 		}
@@ -144,14 +145,13 @@ static void hotplug_decision_work_fn(struct work_struct *work)
 			sampling_rate = 50 * online_cpus;
 			hotplug_offline_work();
 			offline_sample = 1;
+			pr_info("ix_hotplug: Avg Running: %d Sample Rate: %d\n", avg_running, sampling_rate);
 		} else {
 			offline_sample++;
 		}
 		online_sample = 1;
 	}
 	
-	pr_info("ix_hotplug: Avg Running: %d Sample Rate: %d\n", avg_running, sampling_rate);
-
 	queue_delayed_work_on(0, ixwq, &hotplug_decision_work, msecs_to_jiffies(sampling_rate));
 }
 
