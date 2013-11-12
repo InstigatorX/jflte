@@ -66,7 +66,7 @@ struct delayed_work hotplug_decision_work;
 static struct workqueue_struct *ixwq;
 
 static unsigned int enable_all_load = ENABLE_ALL_LOAD_THRESHOLD;
-static unsigned int enable_load = ENABLE_LOAD_THRESHOLD;
+static unsigned int enable_load[5] = {200, 200, 235, 300, 4000};
 static unsigned int disable_load = DISABLE_LOAD_THRESHOLD;
 static unsigned int sampling_rate = SAMPLING_RATE;
 
@@ -130,7 +130,7 @@ static void hotplug_decision_work_fn(struct work_struct *work)
 	if (unlikely((avg_running >= enable_all_load) && (online_cpus < available_cpus))) {
 		pr_info("ix_hotplug: Onlining all CPUs, avg running: %d\n", avg_running);
 		hotplug_online_all_work();
-	} else if ((avg_running >= enable_load) && (online_cpus < available_cpus)) {
+	} else if ((avg_running >= enable_load[online_cpus]) && (online_cpus < available_cpus)) {
 		if (online_sample >= online_sampling_periods) { 
 			hotplug_online_single_work();
 			sampling_rate = 50 * online_cpus + 50;
@@ -177,29 +177,7 @@ static ssize_t store_enable_all_load(struct kobject *kobj,
 
 static struct global_attr enable_all_load_attr = __ATTR(enable_all_load, 0666,
 		show_enable_all_load, store_enable_all_load);
-		
-static ssize_t show_enable_load(struct kobject *kobj,
-				     struct attribute *attr, char *buf)
-{
-	return sprintf(buf, "%d\n", enable_load);
-}
-		
-static ssize_t store_enable_load(struct kobject *kobj,
-				  struct attribute *attr, const char *buf,
-				  size_t count)
-{
-	int ret;
-	long unsigned int val;
 
-	ret = strict_strtoul(buf, 0, &val);
-	if (ret < 0)
-		return ret;
-	enable_load = val;
-	return count;
-}
-
-static struct global_attr enable_load_attr = __ATTR(enable_load, 06666,
-		show_enable_load, store_enable_load);
 		
 static ssize_t show_disable_load(struct kobject *kobj,
 				     struct attribute *attr, char *buf)
@@ -226,7 +204,6 @@ static struct global_attr disable_load_attr = __ATTR(disable_load, 0666,
 
 static struct attribute *ix_hotplug_attributes[] = {
 	&enable_all_load_attr.attr,
-	&enable_load_attr.attr,
 	&disable_load_attr.attr,
 	NULL,
 };
@@ -306,3 +283,7 @@ static int __init ix_hotplug_init(void)
 	return 0;
 }
 late_initcall(ix_hotplug_init);
+
+MODULE_AUTHOR("Steve Loebrich <sloebric@gmail.com>");
+MODULE_DESCRIPTION("ARM Hotplug Driver");
+MODULE_LICENSE("GPL");
