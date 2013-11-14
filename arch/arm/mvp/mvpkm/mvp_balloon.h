@@ -1,7 +1,7 @@
 /*
  * Linux 2.6.32 and later Kernel module for VMware MVP Hypervisor Support
  *
- * Copyright (C) 2010-2012 VMware, Inc. All rights reserved.
+ * Copyright (C) 2010-2013 VMware, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 as published by
@@ -45,6 +45,11 @@
 #define BALLOON_WATCHDOG_TIMEOUT_SECS 90
 
 /**
+ * @brief Threshold to distinguish an oom_score_adj from an oom_adj value.
+ */
+#define USE_OOM_SCORE_ADJ_THRESHOLD 50
+
+/**
  * @brief MVP_BALLOON_GET_DELTA return.
  */
 typedef union {
@@ -62,20 +67,6 @@ typedef union {
  */
 
 /**
- * @brief Android oom_adj levels for the various thresholds.
- */
-typedef enum {
-   BALLOON_ANDROID_GUEST_OOM_ADJ_FOREGROUND_APP = 0,
-   BALLOON_ANDROID_GUEST_OOM_ADJ_VISIBLE_APP = 1,
-   BALLOON_ANDROID_GUEST_OOM_ADJ_SECONDARY_SERVER = 2,
-   BALLOON_ANDROID_GUEST_OOM_ADJ_BACKUP_APP = 2,
-   BALLOON_ANDROID_GUEST_OOM_ADJ_HOME_APP = 4,
-   BALLOON_ANDROID_GUEST_OOM_ADJ_HIDDEN_APP_MIN = 7,
-   BALLOON_ANDROID_GUEST_OOM_ADJ_CONTENT_PROVIDER = 14,
-   BALLOON_ANDROID_GUEST_OOM_ADJ_EMPTY_APP = 15
-} Balloon_AndroidGuestOOMAdj;
-
-/**
  * @brief Android low memory killer thresholds (in pages).
  */
 typedef enum {
@@ -90,6 +81,21 @@ typedef enum {
 } Balloon_AndroidGuestMinFreePages;
 
 /* @} */
+
+/**
+ * @brief Host Android levels for the various thresholds.
+ *
+ * From framework/base/services/java/com/android/server/am/ProcessList.java mOomAdj[]
+ */
+typedef enum {
+   HOST_FOREGROUND_APP = 0,
+   HOST_VISIBLE_APP = 1,
+   HOST_PERCEPTIBLE_APP = 2,
+   HOST_BACKUP_APP = 3,
+   HOST_HIDDEN_APP_MIN = 4,
+   HOST_HIDDEN_APP_MAX = 5,
+} Balloon_AndroidHostApp;
+
 /**
  * @brief Calculate distance to the point at which Android will terminate
  *        processes.
@@ -184,7 +190,6 @@ Balloon_AndroidBackgroundPages(uint32 minHiddenAppOOMScoreAdj)
           * on Android phones, and new phones will all use the oom_score_adj and
           * thus have much bigger numbers (529 for example).
           */
-#define USE_OOM_SCORE_ADJ_THRESHOLD 50
          oom_score_adj = minHiddenAppOOMScoreAdj > USE_OOM_SCORE_ADJ_THRESHOLD ?
                          t->signal->oom_score_adj :
                          t->signal->oom_adj;

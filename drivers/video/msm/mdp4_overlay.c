@@ -2935,6 +2935,7 @@ static int mdp4_calc_pipe_mdp_bw(struct msm_fb_data_type *mfd,
 	int ret = -EINVAL;
 	u32 quota;
 	u32 shift = 16;
+	int offset = 1;
 
 	if (!pipe) {
 		pr_err("%s: pipe is null!\n", __func__);
@@ -2946,11 +2947,17 @@ static int mdp4_calc_pipe_mdp_bw(struct msm_fb_data_type *mfd,
 	}
 
 	fps = mdp_get_panel_framerate(mfd);
-	
+#ifdef CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_VIDEO_FULL_HD_PT
+	if((pipe->src_h==788)&&(pipe->src_w==1026))
+	{
+		offset = 3;
+	}
+#endif
 	if((pipe->bpp==2)&&(pipe->src_format == 0 )) 
 		quota = pipe->src_w * pipe->src_h * fps * pipe->bpp * 2;
 	else 
-		quota = pipe->src_w * pipe->src_h * fps * pipe->bpp; 
+		quota = pipe->src_w * pipe->src_h * fps * pipe->bpp * offset; 
+
 	
 	quota >>= shift;
 

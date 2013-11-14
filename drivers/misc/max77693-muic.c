@@ -1877,6 +1877,11 @@ static int max77693_muic_handle_attach(struct max77693_muic_info *info,
 	default:
 		dev_warn(info->dev, "%s: unsupported adc=0x%x\n", __func__,
 			 adc);
+		info->cable_type = CABLE_TYPE_INCOMPATIBLE_MUIC;
+
+		ret = max77693_muic_set_charging_type(info, !vbvolt);
+		if (ret)
+			info->cable_type = CABLE_TYPE_NONE_MUIC;
 		break;
 	}
 	return ret;

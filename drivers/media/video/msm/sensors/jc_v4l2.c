@@ -3304,7 +3304,7 @@ static int jc_sensor_power_down(struct msm_sensor_ctrl_t *s_ctrl)
 	/* AF off */
 	data->sensor_platform_info->sensor_af_power_off();
 
-	usleep(1*1000); /* Add 1ms delay for off timing */
+	usleep(10*1000); /* Add 1ms delay for off timing */
 
 	/* MCLK */
 	rc = msm_cam_clk_enable(&s_ctrl->sensor_i2c_client->client->dev,

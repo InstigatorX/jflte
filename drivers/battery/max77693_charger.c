@@ -263,9 +263,9 @@ static void max77693_set_input_current(struct max77693_charger_data *charger,
 				if ((chg_state != POWER_SUPPLY_STATUS_CHARGING) &&
 						(chg_state != POWER_SUPPLY_STATUS_FULL))
 					break;
-				/* under 500mA, slow rate */
-				if (set_current_reg < (500 / 20) &&
-						(charger->cable_type == POWER_SUPPLY_TYPE_MAINS))
+				/* under 400mA, slow rate */
+				if (set_current_reg < (400 / 20) &&
+						(charger->cable_type != POWER_SUPPLY_TYPE_BATTERY))
 					charger->aicl_on = true;
 				else
 					charger->aicl_on = false;
@@ -319,9 +319,9 @@ static void max77693_set_input_current(struct max77693_charger_data *charger,
 					(chg_state != POWER_SUPPLY_STATUS_FULL))
 				goto exit;
 			if (curr_step < 2) {
-				/* under 500mA, slow rate */
-				if (now_current_reg < (500 / 20) &&
-						(charger->cable_type == POWER_SUPPLY_TYPE_MAINS))
+				/* under 400mA, slow rate */
+				if (now_current_reg < (400 / 20) &&
+						(charger->cable_type != POWER_SUPPLY_TYPE_BATTERY))
 					charger->aicl_on = true;
 				else
 					charger->aicl_on = false;
@@ -1056,6 +1056,10 @@ static void wpc_detect_work(struct work_struct *work)
 	pr_debug("%s\n", __func__);
 	wake_unlock(&chg_data->wpc_wake_lock);
 
+	reg_data = (0 << WCIN_SHIFT);
+	max77693_update_reg(chg_data->max77693->i2c, MAX77693_CHG_REG_CHG_INT_MASK, reg_data,
+			WCIN_MASK);
+
 	/* get status of cable*/
 	psy_do_property("battery", get,
 			POWER_SUPPLY_PROP_ONLINE, value);
@@ -1077,7 +1081,7 @@ static void wpc_detect_work(struct work_struct *work)
 				POWER_SUPPLY_PROP_ONLINE, value);
 		pr_info("%s: wpc activated, set V_INT as PN\n",
 				__func__);
-	} else if ((chg_data->wc_w_state == 1) && (wc_w_state == 0)) {
+	} else if (wc_w_state == 0) {
 		if (!chg_data->is_charging)
 			max77693_set_charger_state(chg_data, true);
 		max77693_read_reg(chg_data->max77693->i2c,
