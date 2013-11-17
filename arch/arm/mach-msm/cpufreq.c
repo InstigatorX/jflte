@@ -505,6 +505,7 @@ static struct notifier_block __refdata msm_cpufreq_cpu_notifier = {
 extern bool lmf_screen_state;
 #endif
 
+#ifdef CONFIG_EARLYSUSPEND
 static void msm_cpu_early_suspend(struct early_suspend *h)
 {
 #ifdef CONFIG_CPUFREQ_LIMIT_MAX_FREQ
@@ -547,6 +548,7 @@ static struct early_suspend msm_cpu_early_suspend_handler = {
 	.suspend = msm_cpu_early_suspend,
 	.resume = msm_cpu_late_resume,
 };
+#endif
 
 /*
  * Define suspend/resume for cpufreq_driver. Kernel will call
@@ -792,7 +794,9 @@ static int __init msm_cpufreq_register(void)
 	platform_driver_probe(&msm_cpufreq_plat_driver, msm_cpufreq_probe);
 	msm_cpufreq_wq = alloc_workqueue("msm-cpufreq", WQ_HIGHPRI, 0);
 	register_hotcpu_notifier(&msm_cpufreq_cpu_notifier);
+#ifdef CONFIG_EARLYSUSPEND
 	register_early_suspend(&msm_cpu_early_suspend_handler);
+#endif
 	return cpufreq_register_driver(&msm_cpufreq_driver);
 }
 

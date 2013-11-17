@@ -592,8 +592,10 @@ static int mipi_samsung_disp_on(struct platform_device *pdev)
 
 	sec_debug_mdp_reset_value();
 
-	pr_info("[%s]\n", __func__);
+	pr_info("[lcd] %s\n", __func__);
 
+	fb_notifier_call_chain(FB_EVENT_RESUME, NULL);
+	
 	return 0;
 }
 
@@ -645,6 +647,8 @@ static int mipi_samsung_disp_off(struct platform_device *pdev)
 
 	pr_info("[lcd] %s\n", __func__);
 
+	fb_notifier_call_chain(FB_EVENT_SUSPEND, NULL);
+	
 	return 0;
 }
 

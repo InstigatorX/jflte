@@ -46,10 +46,10 @@ typedef int (*pm_callback_t)(struct device *);
  */
 
 LIST_HEAD(dpm_list);
-static LIST_HEAD(dpm_prepared_list);
-static LIST_HEAD(dpm_suspended_list);
-static LIST_HEAD(dpm_late_early_list);
-static LIST_HEAD(dpm_noirq_list);
+LIST_HEAD(dpm_prepared_list);
+LIST_HEAD(dpm_suspended_list);
+LIST_HEAD(dpm_late_early_list);
+LIST_HEAD(dpm_noirq_list);
 
 struct suspend_stats suspend_stats;
 static DEFINE_MUTEX(dpm_list_mtx);
@@ -173,7 +173,7 @@ static ktime_t initcall_debug_start(struct device *dev)
 {
 	ktime_t calltime = ktime_set(0, 0);
 
-	if (pm_print_times_enabled) {
+	if (initcall_debug) {
 		pr_info("calling  %s+ @ %i, parent: %s\n",
 			dev_name(dev), task_pid_nr(current),
 			dev->parent ? dev_name(dev->parent) : "none");
@@ -188,7 +188,7 @@ static void initcall_debug_report(struct device *dev, ktime_t calltime,
 {
 	ktime_t delta, rettime;
 
-	if (pm_print_times_enabled) {
+	if (initcall_debug) {
 		rettime = ktime_get();
 		delta = ktime_sub(rettime, calltime);
 		pr_info("call %s+ returned %d after %Ld usecs\n", dev_name(dev),
@@ -917,6 +917,11 @@ static int dpm_suspend_noirq(pm_message_t state)
 		if (!list_empty(&dev->power.entry))
 			list_move(&dev->power.entry, &dpm_noirq_list);
 		put_device(dev);
+
+		if (pm_wakeup_pending()) {
+			error = -EBUSY;
+			break;
+		}
 	}
 	mutex_unlock(&dpm_list_mtx);
 	if (error)
@@ -990,6 +995,11 @@ static int dpm_suspend_late(pm_message_t state)
 		if (!list_empty(&dev->power.entry))
 			list_move(&dev->power.entry, &dpm_late_early_list);
 		put_device(dev);
+
+		if (pm_wakeup_pending()) {
+			error = -EBUSY;
+			break;
+		}
 	}
 	mutex_unlock(&dpm_list_mtx);
 	if (error)
@@ -1012,7 +1022,7 @@ int dpm_suspend_end(pm_message_t state)
 
 	error = dpm_suspend_noirq(state);
 	if (error) {
-		dpm_resume_early(resume_event(state));
+		dpm_resume_early(state);
 		return error;
 	}
 
@@ -1363,25 +1373,3 @@ int device_pm_wait_for_dev(struct device *subordinate, struct device *dev)
 	return async_error;
 }
 EXPORT_SYMBOL_GPL(device_pm_wait_for_dev);
-
-/**
- * dpm_for_each_dev - device iterator.
- * @data: data for the callback.
- * @fn: function to be called for each device.
- *
- * Iterate over devices in dpm_list, and call @fn for each device,
- * passing it @data.
- */
-void dpm_for_each_dev(void *data, void (*fn)(struct device *, void *))
-{
-	struct device *dev;
-
-	if (!fn)
-		return;
-
-	device_pm_lock();
-	list_for_each_entry(dev, &dpm_list, power.entry)
-		fn(dev, data);
-	device_pm_unlock();
-}
-EXPORT_SYMBOL_GPL(dpm_for_each_dev);

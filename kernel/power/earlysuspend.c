@@ -17,6 +17,7 @@
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/rtc.h>
+#include <linux/syscalls.h> /* sys_sync */
 #include <linux/wakelock.h>
 #include <linux/workqueue.h>
 
@@ -27,8 +28,7 @@ enum {
 	DEBUG_SUSPEND = 1U << 2,
 	DEBUG_VERBOSE = 1U << 3,
 };
-static int debug_mask = DEBUG_USER_STATE | DEBUG_SUSPEND;
-
+static int debug_mask = DEBUG_USER_STATE;
 module_param_named(debug_mask, debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
 
 static DEFINE_MUTEX(early_suspend_lock);
@@ -79,7 +79,6 @@ static void early_suspend(struct work_struct *work)
 
 	mutex_lock(&early_suspend_lock);
 	spin_lock_irqsave(&state_lock, irqflags);
-
 	if (state == SUSPEND_REQUESTED)
 		state |= SUSPENDED;
 	else
@@ -102,11 +101,12 @@ static void early_suspend(struct work_struct *work)
 			pos->suspend(pos);
 		}
 	}
-	set_debug_lock_timer(1, msecs_to_jiffies(5000));
-
 	mutex_unlock(&early_suspend_lock);
 
-	suspend_sys_sync_queue();
+	if (debug_mask & DEBUG_SUSPEND)
+		pr_info("early_suspend: sync\n");
+
+	sys_sync();
 abort:
 	spin_lock_irqsave(&state_lock, irqflags);
 	if (state == SUSPEND_REQUESTED_AND_SUSPENDED)
@@ -122,14 +122,11 @@ static void late_resume(struct work_struct *work)
 
 	mutex_lock(&early_suspend_lock);
 	spin_lock_irqsave(&state_lock, irqflags);
-
 	if (state == SUSPENDED)
 		state &= ~SUSPENDED;
 	else
 		abort = 1;
 	spin_unlock_irqrestore(&state_lock, irqflags);
-
-	set_debug_lock_timer(0, 0);
 
 	if (abort) {
 		if (debug_mask & DEBUG_SUSPEND)

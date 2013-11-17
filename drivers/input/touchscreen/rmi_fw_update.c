@@ -731,12 +731,14 @@ static int fwu_do_reflash(void)
 {
 	int retval;
 
+#ifdef CONFIG_SEC_DVFS
 	retval = set_freq_limit(DVFS_TOUCH_ID,
 				MIN_TOUCH_LIMIT);
 	if (retval < 0)
 		dev_err(&fwu->rmi4_data->i2c_client->dev,
 			"%s: dvfs failed at fw update.\n",
 			__func__);
+#endif
 
 	retval = fwu_enter_flash_prog();
 	if (retval < 0)
@@ -1118,11 +1120,13 @@ done:
 	if (fw_entry)
 		release_firmware(fw_entry);
 out:
+#ifdef CONFIG_SEC_DVFS
 	retval = set_freq_limit(DVFS_TOUCH_ID, -1);
 	if (retval < 0)
 		dev_err(&fwu->rmi4_data->i2c_client->dev,
 			"%s: in fw update, failed booster stop.\n",
 			__func__);
+#endif
 
 	dev_info(&fwu->rmi4_data->i2c_client->dev, "%s: End of reflash process\n",
 		 __func__);
