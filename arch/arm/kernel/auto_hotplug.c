@@ -36,6 +36,8 @@
 #include <linux/workqueue.h>
 #include <linux/sched.h>
 #include <linux/cpufreq.h>
+#include <linux/notifier.h>
+#include <linux/fb.h>
 
 #include <mach/cpufreq.h>
 
@@ -64,6 +66,8 @@
 struct delayed_work hotplug_decision_work;
 
 static struct workqueue_struct *ixwq;
+static struct work_struct suspend;
+static struct work_struct resume;
 
 static unsigned int enable_all_load = ENABLE_ALL_LOAD_THRESHOLD;
 static unsigned int enable_load[5] = {200, 200, 235, 300, 4000};
@@ -213,15 +217,14 @@ static struct attribute_group ix_hotplug_attr_group = {
 	.name = "ix_hotplug",
 };
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
-static void ix_hotplug_early_suspend(struct early_suspend *handler)
+static void hotplug_suspend(struct work_struct *work)
 {
 	int i;
 	
 	pr_info("ix_hotplug: early suspend handler\n");
 
 	/* Cancel all scheduled delayed work to avoid races */
-	cancel_delayed_work_sync(&hotplug_decision_work);
+	cancel_delayed_work(&hotplug_decision_work);
 	flush_workqueue(ixwq);
 	
 	for (i = 3; i > 0; i--) {
@@ -230,7 +233,7 @@ static void ix_hotplug_early_suspend(struct early_suspend *handler)
     pr_info("ix_hotplug: Offlining CPUs for early suspend\n");
 }
 
-static void ix_hotplug_late_resume(struct early_suspend *handler)
+static void __ref hotplug_resume(struct work_struct *work)
 {
 
 	pr_info("ix_hotplug: late resume handler\n");
@@ -240,12 +243,27 @@ static void ix_hotplug_late_resume(struct early_suspend *handler)
 	queue_delayed_work_on(0, ixwq, &hotplug_decision_work, msecs_to_jiffies(sampling_rate));
 }
 
-static struct early_suspend ix_hotplug_suspend = {
-	.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1,
-	.suspend = ix_hotplug_early_suspend,
-	.resume = ix_hotplug_late_resume,
+static int __ref ix_notifier_callback(struct notifier_block *self,
+                                unsigned long action, void *data)
+{
+    switch (action) {
+		case FB_EVENT_RESUME:
+			pr_info("ix_hotplug: LCD is on - %lu\n", action);
+			schedule_work(&resume);
+			break;
+		case FB_EVENT_SUSPEND:
+			pr_info("ix_hotplug: LCD is off - %lu\n", action);
+			schedule_work(&suspend);
+			break;
+		default:
+			break;
+	}
+	return 0;
+}
+
+static struct notifier_block ix_event_notifier = {
+        .notifier_call  = ix_notifier_callback,
 };
-#endif /* CONFIG_HAS_EARLYSUSPEND */
 
 static int __init ix_hotplug_init(void)
 {
@@ -265,10 +283,14 @@ static int __init ix_hotplug_init(void)
     
     if (!ixwq)
         return -ENOMEM;
+        
+    fb_register_client(&ix_event_notifier);
 	
 	rc = sysfs_create_group(cpufreq_global_kobject,
 				&ix_hotplug_attr_group);
 	
+	INIT_WORK(&suspend, hotplug_suspend);
+    INIT_WORK(&resume, hotplug_resume);
 	INIT_DELAYED_WORK(&hotplug_decision_work, hotplug_decision_work_fn);
 
 	/*
