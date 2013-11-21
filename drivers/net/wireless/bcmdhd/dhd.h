@@ -304,6 +304,7 @@ typedef struct dhd_pub {
 	uint8 htsfdlystat_sz; /* Size of delay stats, max 255B */
 #endif
 	struct reorder_info *reorder_bufs[WLHOST_REORDERDATA_MAXFLOWS];
+	char  fw_capabilities[WLC_IOCTL_SMLEN];
 #ifdef RXFRAME_THREAD
 #ifdef CUSTOMER_HW4
 #define MAXSKBPEND 1024
@@ -978,6 +979,7 @@ extern void dhd_wait_event_wakeup(dhd_pub_t*dhd);
 #define IFUNLOCK(lock)  InterlockedExchange((lock), 0)
 #define IFLOCK_FREE(lock)
 
+#define FW_SUPPORTED(dhd, capa) ((strstr(dhd->fw_capabilities, #capa) != NULL))
 #ifdef PNO_SUPPORT
 extern int dhd_pno_enable(dhd_pub_t *dhd, int pfn_enabled);
 extern int dhd_pnoenable(dhd_pub_t *dhd, int pfn_enabled);
