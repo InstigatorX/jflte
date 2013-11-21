@@ -1,4 +1,4 @@
-/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-13, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -44,6 +44,11 @@
 
 #define TO_SECS(arr)		(arr[0] | (arr[1] << 8) | (arr[2] << 16) | \
 							(arr[3] << 24))
+
+/* Module parameter to control power-on-alarm */
+static bool poweron_alarm;
+module_param(poweron_alarm, bool, 0644);
+MODULE_PARM_DESC(poweron_alarm, "Enable/Disable power-on alarm");
 
 /* rtc driver internal structure */
 struct qpnp_rtc {
@@ -503,12 +508,17 @@ static int __devinit qpnp_rtc_probe(struct spmi_device *spmi)
 		}
 	}
 
-	rtc_dd->rtc_ctrl_reg = BIT_RTC_ENABLE;
-	rc = qpnp_write_wrapper(rtc_dd, &rtc_dd->rtc_ctrl_reg,
+	rc = qpnp_read_wrapper(rtc_dd, &rtc_dd->rtc_ctrl_reg,
 				rtc_dd->rtc_base + REG_OFFSET_RTC_CTRL, 1);
 	if (rc) {
 		dev_err(&spmi->dev,
-				"Write to RTC control reg failed\n");
+			"Read from RTC control reg failed\n");
+		goto fail_rtc_enable;
+	}
+
+	if (!(rtc_dd->rtc_ctrl_reg & BIT_RTC_ENABLE)) {
+		dev_err(&spmi->dev,
+			"RTC h/w disabled, rtc not registered\n");
 		goto fail_rtc_enable;
 	}
 
@@ -581,7 +591,7 @@ static void qpnp_rtc_shutdown(struct spmi_device *spmi)
 	struct qpnp_rtc *rtc_dd = dev_get_drvdata(&spmi->dev);
 	bool rtc_alarm_powerup = rtc_dd->rtc_alarm_powerup;
 
-	if (!rtc_alarm_powerup) {
+	if (!rtc_alarm_powerup && !poweron_alarm) {
 		spin_lock_irqsave(&rtc_dd->alarm_ctrl_lock, irq_flags);
 		dev_dbg(&spmi->dev, "Disabling alarm interrupts\n");
 

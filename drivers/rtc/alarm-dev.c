@@ -68,10 +68,6 @@ static long alarm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	enum android_alarm_type alarm_type = ANDROID_ALARM_IOCTL_TO_TYPE(cmd);
 	uint32_t alarm_type_mask = 1U << alarm_type;
 
-#ifdef CONFIG_RTC_AUTO_PWRON
-	char bootalarm_data[14]; 
-#endif
-
 	if (alarm_type >= ANDROID_ALARM_TYPE_COUNT)
 		return -EINVAL;
 
@@ -102,6 +98,8 @@ static long alarm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 				wake_unlock(&alarm_wake_lock);
 		}
 		alarm_enabled &= ~alarm_type_mask;
+		if (alarm_type == ANDROID_ALARM_RTC_WAKEUP)
+			set_power_on_alarm(0);
 		spin_unlock_irqrestore(&alarm_slock, flags);
 		break;
 
@@ -129,6 +127,10 @@ from_old_alarm_set:
 		alarm_start_range(&alarms[alarm_type],
 			timespec_to_ktime(new_alarm_time),
 			timespec_to_ktime(new_alarm_time));
+		if ((alarm_type == ANDROID_ALARM_RTC_WAKEUP) &&
+				(ANDROID_ALARM_BASE_CMD(cmd) ==
+				 ANDROID_ALARM_SET(0)))
+			set_power_on_alarm(new_alarm_time.tv_sec);
 		spin_unlock_irqrestore(&alarm_slock, flags);
 		if (ANDROID_ALARM_BASE_CMD(cmd) != ANDROID_ALARM_SET_AND_WAIT(0)
 		    && cmd != ANDROID_ALARM_SET_AND_WAIT_OLD)
@@ -165,18 +167,6 @@ from_old_alarm_set:
 		if (rv < 0)
 			goto err1;
 		break;
-
-#ifdef CONFIG_RTC_AUTO_PWRON
-	case ANDROID_ALARM_SET_ALARM:
-		printk("%s [RTC] \n",__func__);
-		if (copy_from_user(bootalarm_data, (void __user *)arg, 14)) {
-			rv = -EFAULT;
-			goto err1;
-		}
-		rv = alarm_set_alarm(bootalarm_data);
-		break; 
-#endif
-
 	case ANDROID_ALARM_GET_TIME(0):
 		switch (alarm_type) {
 		case ANDROID_ALARM_RTC_WAKEUP:
