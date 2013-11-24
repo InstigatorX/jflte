@@ -1,5 +1,7 @@
 config ZSMALLOC
-	bool "Memory allocator for compressed pages"
+	tristate "Memory allocator for compressed pages"
+	# X86 dependency is because of the use of __flush_tlb_one and set_pte
+	# in zsmalloc-main.c.
 	default n
 	help
 	  zsmalloc is a slab-based memory allocator designed to store
