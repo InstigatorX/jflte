@@ -747,7 +747,7 @@ static int qseecom_load_app(struct qseecom_dev_handle *data, void __user *argp)
 			if (!IS_ERR_OR_NULL(ihandle))
 				ion_free(qseecom.ion_clnt, ihandle);
 			qsee_disable_clock_vote(CLK_SFPB);
-			return -EFAULT;
+			return 0;
 		}
 
 		app_id = resp.data;
