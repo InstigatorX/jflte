@@ -454,7 +454,8 @@ static int msm_cpufreq_resume(struct cpufreq_policy *policy)
 
 static struct cpufreq_driver msm_cpufreq_driver = {
 	/* lps calculations are handled here. */
-	.flags		= CPUFREQ_STICKY | CPUFREQ_CONST_LOOPS,
+	.flags		= CPUFREQ_STICKY | CPUFREQ_CONST_LOOPS |
+						CPUFREQ_NEED_INITIAL_FREQ_CHECK,
 	.init		= msm_cpufreq_init,
 	.verify		= cpufreq_generic_frequency_table_verify,
 	.target		= msm_cpufreq_target,
