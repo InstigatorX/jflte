@@ -77,7 +77,7 @@ static unsigned int offline_sample = 1;
 static unsigned int online_sampling_periods = ONLINE_SAMPLING_PERIODS;
 static unsigned int offline_sampling_periods = OFFLINE_SAMPLING_PERIODS;
 
-static void hotplug_online_single_work(void)
+static void __cpuinit hotplug_online_single_work(void)
 {
 	int cpu;
 
@@ -93,7 +93,7 @@ static void hotplug_online_single_work(void)
 	return;
 }
 
-static void hotplug_online_all_work(void)
+static void __cpuinit hotplug_online_all_work(void)
 {
 	int cpu;
 	for_each_possible_cpu(cpu) {
@@ -118,7 +118,7 @@ static void hotplug_offline_work(void)
 	return;
 }
 
-static void hotplug_decision_work_fn(struct work_struct *work)
+static void __cpuinit hotplug_decision_work_fn(struct work_struct *work)
 {
 	unsigned int online_cpus;
 	unsigned int avg_running, io_wait;
@@ -230,7 +230,7 @@ static void ix_hotplug_early_suspend(struct early_suspend *handler)
     pr_info("ix_hotplug: Offlining CPUs for early suspend\n");
 }
 
-static void ix_hotplug_late_resume(struct early_suspend *handler)
+static void __cpuinit ix_hotplug_late_resume(struct early_suspend *handler)
 {
 
 	pr_info("ix_hotplug: late resume handler\n");
