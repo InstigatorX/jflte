@@ -26,8 +26,8 @@
 #
 
 import init.qcom.usb.rc
-import init.ril.rc
 import init.target.rc
+import init.ril.rc
 
 on init
     # See storage config details at http://source.android.com/tech/storage/
@@ -43,7 +43,6 @@ on init
     mkdir /persist 0771 system system
     # See storage config details at http://source.android.com/tech/storage/
     mkdir /mnt/shell/emulated 0700 shell shell
-    mkdir /storage 0550 system sdcard_r
     mkdir /storage/emulated 0555 root root    
 
     export EXTERNAL_STORAGE /storage/emulated/legacy
@@ -58,7 +57,6 @@ on init
     symlink /storage/emulated/legacy /storage/sdcard0
     symlink /mnt/shell/emulated/0 /storage/emulated/legacy
 
-    export SECONDARY_STORAGE /storage/extSdCard
     # map "real" external storages paths also in same way. backwards compatibility.
     symlink /storage/extSdCard /mnt/extSdCard
     symlink /storage/UsbDriveA /mnt/UsbDriveA
@@ -68,7 +66,7 @@ on init
     symlink /storage/UsbDriveE /mnt/UsbDriveE
     symlink /storage/UsbDriveF /mnt/UsbDriveF
 
-    export SECONDARY_STORAGE /storage/extSdCard:/storage/UsbDriveA:/storage/UsbDriveB:/storage/UsbDriveC:/storage/UsbDriveD:/storage/UsbDriveE:/storage/UsbDriveF
+    export SECONDARY_STORAGE /storage/extSdCard
     
     mkdir /storage/extSdCard 0700 root root
     mkdir /storage/UsbDriveA 0700 root root
@@ -81,8 +79,14 @@ on init
 on early-boot
     # set RLIMIT_MEMLOCK to 64MB
     setrlimit 8 67108864 67108864
-    exec /system/bin/sh /init.qcom.early_boot.sh ${ro.board.platform}
-    exec /system/bin/sh /init.qcom.syspart_fixup.sh ${ro.board.platform} ${ro.serialno}
+    # exec /system/bin/sh /init.qcom.early_boot.sh ${ro.board.platform}
+    # exec /system/bin/sh /init.qcom.syspart_fixup.sh ${ro.board.platform} ${ro.serialno}
+    setprop qcom.audio.init complete
+
+service modem-sh /system/bin/sh /system/etc/init.qcom.modem_links.sh
+    class core
+    user root
+    oneshot
 
 on boot
     chown bluetooth bluetooth /sys/module/bluetooth_power/parameters/power
@@ -95,7 +99,7 @@ on boot
     chmod 0660 /sys/module/hci_smd/parameters/hcismd_set
     chmod 0660 /sys/class/rfkill/rfkill0/state
     chmod 0660 /proc/bluetooth/sleep/proto
-    chown bluetooth bluetooth /dev/ttyHS0
+    chown bluetooth net_bt_stack /dev/ttyHS0
     chmod 0660 /dev/ttyHS0
     chown bluetooth bluetooth /sys/devices/platform/msm_serial_hs.0/clock
     chmod 0660 /sys/devices/platform/msm_serial_hs.0/clock
@@ -183,19 +187,7 @@ on post-fs-data
     # Create the directories used by the Wireless subsystem
     mkdir /data/misc/wifi 0770 wifi system
     mkdir /data/misc/wifi/sockets 0770 wifi wifi
-    
-    mkdir /system/etc/wifi 0770 wifi wifi 
-    chmod 0770 /system/etc/wifi 
-    chmod 0660 /system/etc/wifi/wpa_supplicant.conf 
-    chown wifi wifi /system/etc/wifi/wpa_supplicant.conf 
-    #wpa_supplicant control socket for android wifi.c (android private socket) 
-    mkdir /data/misc/wifi 0770 wifi wifi 
-    mkdir /data/misc/wifi/sockets 0770 wifi wifi 
-    chmod 0770 /data/misc/wifi 
-    chmod 0660 /data/misc/wifi/wpa_supplicant.conf 
-    chown wifi wifi /data/misc/wifi 
-    chown wifi wifi /data/misc/wifi/wpa_supplicant.conf
-    
+    mkdir /data/misc/wifi/wpa_supplicant 0770 wifi wifi
     mkdir /data/misc/dhcp 0775 dhcp dhcp
     chown dhcp dhcp /data/misc/dhcp
 
@@ -203,17 +195,32 @@ on post-fs-data
     mkdir /data/connectivity 0771 system system
     chown system system /data/connectivity
 
+    mkdir /data/connectivity/nsrm 0771 system system
+    chown system system /data/connectivity/nsrm
+
     # for WIFI TRP/TIS
-    write /data/.psm.info 1
     chown system root /data/.psm.info
-    chmod 0660 /data/.psm.info
+    chmod 0664 /data/.psm.info
+
+    # for WIFI Antena Selection
+    chown system root /data/.ant.info
+    chmod 0664 /data/.ant.info
+
+    # for WIFI Version
+	write /data/.wifiver.info 0
+    chown system root /data/.wifiver.info
+    chmod 0666 /data/.wifiver.info
+
+    # for WIFI Cert
+    chmod 0664 /data/.bustxglom.info
+    chmod 0664 /data/.roamoff.info
+    chmod 0664 /data/.frameburst.info
+    chmod 0664 /data/.txbf.info
 
     # for WIFI MAC address
     mkdir /efs/wifi 0775 radio system
     chown system system /efs/wifi/.mac.info
     chmod 0664 /efs/wifi/.mac.info
-
-    setprop wifi.interface wlan0
 
     # Create directory used by audio subsystem
     mkdir /data/misc/audio 0770 audio audio
@@ -307,14 +314,14 @@ service qcom-c_core-sh /system/bin/sh /init.qcom.class_core.sh
     user root
     oneshot
 
-service config_ril /system/bin/sh /system/etc/init.ril.sh
+service qcom-ril-sh /system/bin/sh /init.ril.sh
     class main
     user root
+    disabled
     oneshot
 
 on property:vold.decrypt=trigger_restart_framework
-    start qcom-c_main-sh
-    start config_ril
+    start qcom-ril-sh
     start config_bluetooth
 
 service cnd /system/bin/cnd
@@ -333,30 +340,6 @@ service rmt_storage /system/bin/rmt_storage
 
 on property:ro.boot.emmc=true
     start rmt_storage
-
-service config_bluetooth /system/bin/sh /system/etc/init.qcom.bt.sh "onboot"
-    class core
-    user root
-    oneshot
-
-service dbus /system/bin/dbus-daemon --system --nofork
-    class core
-    socket dbus stream 660 bluetooth bluetooth
-    user bluetooth
-    group bluetooth net_bt_admin
-    disabled
-
-on property:ro.qc.bluetooth.stack=bluez
-    start dbus
-
-service bluetoothd /system/bin/logwrapper /system/bin/bluetoothd -n
-    class main
-    socket bluetooth stream 660 bluetooth bluetooth
-    socket dbus_bluetooth stream 660 bluetooth bluetooth
-    # init.rc does not yet support applying capabilities, so run as root and
-    # let bluetoothd drop uid to bluetooth with the right linux capabilities
-    group bluetooth net_bt_admin misc net_bt_stack
-    disabled
 
 service hciattach /system/bin/sh /system/etc/init.qcom.bt.sh
     class late_start
@@ -470,7 +453,7 @@ service wpa_supplicant /system/bin/wpa_supplicant -g@android:wpa_wlan0 \
     disabled
     oneshot
 
-service dhcpcd_wlan0 /system/bin/dhcpcd -ABKLG
+service dhcpcd_wlan0 /system/bin/dhcpcd -ABKL
     class late_start
     disabled
     oneshot
@@ -704,45 +687,50 @@ service profiler_daemon /system/bin/profiler_daemon
     group root
     disabled
 
-service sdcard /system/bin/sdcard /data/media /mnt/shell/emulated 1023 1023
+# virtual sdcard daemon running as media_rw (1023)
+service sdcard /system/bin/sdcard -u 1023 -g 1023 -l -r /data/media /mnt/shell/emulated
     class late_start
     disabled
-    
+    oneshot
+
 on property:ro.fuse_sdcard=true
     start sdcard
 
-service fuse_extSdCard /system/bin/sdcard -u 1023 -g 1023 -w 1023 -d /mnt/media_rw/extSdCard /storage/extSdCard
+#service fuse_extSdCard /system/bin/sdcard -u 1023 -g 1023 -w 1023 -d -f /mnt/media_rw/extSdCard /storage/extSdCard
+service fuse_extSdCard /system/bin/sdcard -u 1023 -g 1023 -d -f /mnt/media_rw/extSdCard /storage/extSdCard
     class late_start
     disabled
+    oneshot
 
-service fuse_extSdCard /system/bin/sdcard -u 1023 -g 1023 -d /mnt/media_rw/extSdCard /storage/extSdCard
+service fuse_UsbDriveA /system/bin/sdcard -u 1023 -g 1023 -d -f /mnt/media_rw/UsbDriveA /storage/UsbDriveA
     class late_start
     disabled
+    oneshot
 
-service fuse_UsbDriveA /system/bin/sdcard -u 1023 -g 1023 -d /mnt/media_rw/UsbDriveA /storage/UsbDriveA
+service fuse_UsbDriveB /system/bin/sdcard -u 1023 -g 1023 -d -f /mnt/media_rw/UsbDriveB /storage/UsbDriveB
     class late_start
     disabled
+    oneshot
 
-service fuse_UsbDriveB /system/bin/sdcard -u 1023 -g 1023 -d /mnt/media_rw/UsbDriveB /storage/UsbDriveB
+service fuse_UsbDriveC /system/bin/sdcard -u 1023 -g 1023 -d -f /mnt/media_rw/UsbDriveC /storage/UsbDriveC
     class late_start
     disabled
+    oneshot
 
-service fuse_UsbDriveC /system/bin/sdcard -u 1023 -g 1023 -d /mnt/media_rw/UsbDriveC /storage/UsbDriveC
+service fuse_UsbDriveD /system/bin/sdcard -u 1023 -g 1023 -d -f /mnt/media_rw/UsbDriveD /storage/UsbDriveD
     class late_start
     disabled
+    oneshot
 
-service fuse_UsbDriveD /system/bin/sdcard -u 1023 -g 1023 -d /mnt/media_rw/UsbDriveD /storage/UsbDriveD
+service fuse_UsbDriveE /system/bin/sdcard -u 1023 -g 1023 -d -f /mnt/media_rw/UsbDriveE /storage/UsbDriveE
     class late_start
     disabled
+    oneshot
 
-service fuse_UsbDriveE /system/bin/sdcard -u 1023 -g 1023 -d /mnt/media_rw/UsbDriveE /storage/UsbDriveE
+service fuse_UsbDriveF /system/bin/sdcard -u 1023 -g 1023 -d -f /mnt/media_rw/UsbDriveF /storage/UsbDriveF
     class late_start
     disabled
-
-service fuse_UsbDriveF /system/bin/sdcard -u 1023 -g 1023 -d /mnt/media_rw/UsbDriveF /storage/UsbDriveF
-    class late_start
-    disabled
-
+    oneshot
 
 # Binding fuse mount point to /storage/emulated/legacy
 #on property:init.svc.sdcard=running
