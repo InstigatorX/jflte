@@ -138,6 +138,7 @@ loglevel 3
     write /dev/cpuctl/apps/cpu.shares 1024
     write /dev/cpuctl/apps/cpu.rt_runtime_us 800000
     write /dev/cpuctl/apps/cpu.rt_period_us 1000000
+    write /dev/cpuctl/apps/cpu.notify_on_migrate 1
 
     mkdir /dev/cpuctl/apps/bg_non_interactive
     chown system system /dev/cpuctl/apps/bg_non_interactive/tasks
