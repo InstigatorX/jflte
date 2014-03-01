@@ -18,3 +18,5 @@
 /devices/platform/msm_hsusb_host/usb*sdd            auto                    vfat    default     voldmanaged=UsbDriveD:auto
 /devices/platform/msm_hsusb_host/usb*sde            auto                    vfat    default     voldmanaged=UsbDriveE:auto
 /devices/platform/msm_hsusb_host/usb*sdf            auto                    vfat    default     voldmanaged=UsbDriveF:auto
+
+/dev/block/zram0				    none		    swap    defaults    zramsize=50000000
