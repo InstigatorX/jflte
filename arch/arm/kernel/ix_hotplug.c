@@ -61,8 +61,9 @@
 #define OFFLINE_SAMPLING_PERIODS	5
 #define SAMPLING_RATE				100
 
-struct delayed_work hotplug_decision_work;
-
+static struct delayed_work hotplug_decision_work;
+static struct work_struct suspend;
+static struct work_struct resume;
 static struct workqueue_struct *ixwq;
 
 static unsigned int enable_all_load = ENABLE_ALL_LOAD_THRESHOLD;
@@ -214,33 +215,45 @@ static struct attribute_group ix_hotplug_attr_group = {
 };
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
-static void ix_hotplug_early_suspend(struct early_suspend *handler)
+static void ix_hotplug_suspend(struct work_struct *work)
 {
-	int i;
-	
+	int cpu;
+
 	pr_info("ix_hotplug: early suspend handler\n");
 
-	/* Cancel all scheduled delayed work to avoid races */
-	cancel_delayed_work_sync(&hotplug_decision_work);
-	flush_workqueue(ixwq);
-	
-	for (i = 3; i > 0; i--) {
-		cpu_down(i);
+	for_each_online_cpu(cpu)
+	{
+		if (!cpu)
+			continue;
+
+		cpu_down(cpu);
 	}
-    pr_info("ix_hotplug: Offlining CPUs for early suspend\n");
+}
+
+static void __ref ix_hotplug_resume(struct work_struct *work)
+{
+	int cpu;
+
+	for_each_possible_cpu(cpu)
+	{
+		if (!cpu)
+			continue;
+
+		cpu_up(cpu);
+	}
+}
+
+static void ix_hotplug_early_suspend(struct early_suspend *handler)
+{
+	schedule_work(&suspend);
 }
 
 static void __cpuinit ix_hotplug_late_resume(struct early_suspend *handler)
 {
-
-	pr_info("ix_hotplug: late resume handler\n");
-
-	hotplug_online_single_work();
-	
-	queue_delayed_work_on(0, ixwq, &hotplug_decision_work, msecs_to_jiffies(sampling_rate));
+	schedule_work(&resume);
 }
 
-static struct early_suspend ix_hotplug_suspend = {
+static struct early_suspend ix_hotplug_driver = {
 	.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1,
 	.suspend = ix_hotplug_early_suspend,
 	.resume = ix_hotplug_late_resume,
@@ -266,19 +279,21 @@ static int __init ix_hotplug_init(void)
     if (!ixwq)
         return -ENOMEM;
 	
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	register_early_suspend(&ix_hotplug_driver);
+#endif
+
 	rc = sysfs_create_group(cpufreq_global_kobject,
 				&ix_hotplug_attr_group);
 	
+	INIT_WORK(&suspend, ix_hotplug_suspend);
+	INIT_WORK(&resume, ix_hotplug_resume);
 	INIT_DELAYED_WORK(&hotplug_decision_work, hotplug_decision_work_fn);
 
 	/*
 	 * Give the system time to boot before fiddling with hotplugging.
 	 */
 	queue_delayed_work_on(0, ixwq, &hotplug_decision_work, delay);
-
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	register_early_suspend(&ix_hotplug_suspend);
-#endif
 
 	return 0;
 }
