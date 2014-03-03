@@ -49,6 +49,7 @@ user=_app seinfo=sprintitson domain=itsonclient_app type=sprintitson_file
 user=sprintitson seinfo=sprintitson domain=itsonclient_app type=sprintitson_file
 user=_app seinfo=iwlanservice domain=carrier_app type=app_data_file
 user=_app seinfo=tbmon domain=carrier_app type=app_data_file
+user=_app seinfo=mmphone domain=carrier_app type=app_data_file
 user=system name=com.sec.android.app.felicatest domain=felica type=felica_data_file
 user=mfc domain=mfc type=felica_data_file
 user=mfm domain=mfm type=felica_data_file
@@ -62,4 +63,3 @@ user=oneseg name=com.nextreaming.player.apps domain=oneseg_apk type=oneseg_data_
 user=oneseg name=com.access.bml domain=oneseg_apk type=oneseg_data_file
 user=_app seinfo=dm3lmdocomo domain=dmdocomo_app type=app_data_file
 user=_app seinfo=fixmo domain=fixmo_app type=fixmo_app_data_file
-user=_app seinfo=goodtech domain=good_app type=good_app_data_file

@@ -25,8 +25,9 @@ on early-init
     start ueventd
 
 # Configure SEAndroid booleans and enforcing mode
-     setsebool debugfs 1
-
+     setsebool debugfs 0
+	 setenforce 0	
+	
 # create mountpoints
     mkdir /mnt 0775 root system
 
@@ -78,7 +79,7 @@ loglevel 3
 
     # See storage config details at http://source.android.com/tech/storage/
     mkdir /mnt/shell 0750 shell shell
-    mkdir /mnt/media_rw 0700 media_rw media_rw
+    mkdir /mnt/media_rw 0750 media_rw media_rw
     mkdir /storage 0751 root sdcard_r
 
     # Directory for putting things only root should see.
@@ -204,7 +205,7 @@ on post-fs
 
 on post-fs-data
     # Reload SE Android Policy
-    setprop selinux.reload_policy 1
+    setprop selinux.reload_policy 0
 
     # We chown/chmod /data again so because mount is run as root + defaults
     chown system system /data
@@ -331,6 +332,20 @@ on post-fs-data
     mkdir /system/lib/drm 0775
     chown root root /system/lib/drm
     chmod 0775 /system/lib/drm
+
+    # DivX DRM
+    mkdir /efs/.files 0775
+    mkdir /efs/.files/.dx1 0775
+    mkdir /efs/.files/.dm33 0775
+    mkdir /efs/.files/.mp301 0775
+    chown media system /efs/.files/.dx1
+    chown media system /efs/.files/.dm33
+    chown media system /efs/.files/.mp301
+    chmod 0775 /efs/.files/.dx1
+    chmod 0775 /efs/.files/.dm33
+    chmod 0775 /efs/.files/.mp301
+
+    restorecon -R /efs
 # ]
 
     # MTP device permission
@@ -675,7 +690,34 @@ on nonencrypted
     class_start late_start
 
 on charger
+    mount_all fstab.qcom
     class_start charger
+    write /sys/devices/system/cpu/cpu1/online 1
+    write /sys/devices/system/cpu/cpu2/online 1
+    write /sys/devices/system/cpu/cpu3/online 1
+    write /sys/module/pm_8x60/modes/cpu0/power_collapse/suspend_enabled 1
+    write /sys/module/pm_8x60/modes/cpu1/power_collapse/suspend_enabled 1
+    write /sys/module/pm_8x60/modes/cpu2/power_collapse/suspend_enabled 1
+    write /sys/module/pm_8x60/modes/cpu3/power_collapse/suspend_enabled 1
+    write /sys/module/pm_8x60/modes/cpu0/standalone_power_collapse/suspend_enabled 1
+    write /sys/module/pm_8x60/modes/cpu1/standalone_power_collapse/suspend_enabled 1
+    write /sys/module/pm_8x60/modes/cpu2/standalone_power_collapse/suspend_enabled 1
+    write /sys/module/pm_8x60/modes/cpu3/standalone_power_collapse/suspend_enabled 1
+    write /sys/module/pm_8x60/modes/cpu0/standalone_power_collapse/idle_enabled 1
+    write /sys/module/pm_8x60/modes/cpu1/standalone_power_collapse/idle_enabled 1
+    write /sys/module/pm_8x60/modes/cpu2/standalone_power_collapse/idle_enabled 1
+    write /sys/module/pm_8x60/modes/cpu3/standalone_power_collapse/idle_enabled 1
+    write /sys/module/pm_8x60/modes/cpu0/power_collapse/idle_enabled 0
+    write /sys/module/pm_8x60/modes/cpu1/power_collapse/idle_enabled 0
+    write /sys/module/pm_8x60/modes/cpu2/power_collapse/idle_enabled 0
+    write /sys/module/pm_8x60/modes/cpu3/power_collapse/idle_enabled 0
+    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor "powersave"
+    write /sys/devices/system/cpu/cpu1/cpufreq/scaling_governor "powersave"
+    write /sys/devices/system/cpu/cpu2/cpufreq/scaling_governor "powersave"
+    write /sys/devices/system/cpu/cpu3/cpufreq/scaling_governor "powersave"
+    write /sys/devices/system/cpu/cpu1/online 0
+    write /sys/devices/system/cpu/cpu2/online 0
+    write /sys/devices/system/cpu/cpu3/online 0
 
 on property:vold.decrypt=trigger_reset_main
     class_reset main
@@ -716,14 +758,14 @@ service healthd /sbin/healthd
     critical
     seclabel u:r:healthd:s0
 
-#service lpm /system/bin/lpm
-#    class charger
-#    critical
+service lpm /system/bin/lpm
+    class charger
+    critical
 
-#service healthd-charger /sbin/healthd -n
-#    class charger
-#    critical
-#    seclabel u:r:healthd:s0
+service healthd-charger /sbin/healthd -n
+    class charger
+    critical
+    seclabel u:r:healthd:s0
 
 on property:selinux.reload_policy=1
     chown system system /sys/fs/selinux/enforce
@@ -896,6 +938,12 @@ service bootanim /system/bin/bootanimation
     disabled
     oneshot
 
+service sysinit /system/bin/logwrapper /system/xbin/busybox run-parts /system/etc/init.d
+     class late_start
+     user root
+     group shell
+     oneshot
+
 service installd /system/bin/installd
     class main
     socket installd stream 600 system system
@@ -1028,9 +1076,3 @@ on property:init.svc.media=restarting
 
 on property:sys.boot_completed=1
     write /sys/block/mmcblk0/queue/scheduler cfq
-
-# init Adam Kernel
-service adaminit /sbin/adam.sh
-    class core
-    user root
-    oneshot
