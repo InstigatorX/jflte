@@ -7,6 +7,7 @@ CROSS_COMPILE=/opt/toolchains/arm-linux-androideabi-4.8/prebuilt/darwin-x86_64/b
 #export CROSS_COMPILE=/opt/toolchains/arm-eabi-4.7/bin/arm-linux-androideabi-
 export LOCALVERSION="$timestamp"
 
+#export VARIANT_DEFCONFIG=ix_jf_defconfig; make ix_jf_defconfig
 #make VARIANT_DEFCONFIG=jf_att_defconfig jf_defconfig SELINUX_DEFCONFIG=selinux_defconfig
 
 make -j8
