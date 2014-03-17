@@ -353,10 +353,10 @@ CHECK		= sparse
 
 CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
 		  -Wbitwise -Wno-return-void $(CF)
-CFLAGS_MODULE   =
-AFLAGS_MODULE   =
+CFLAGS_MODULE   = -DMODULE -marm -mcpu=cortex-a15 -mtune=cortex-a15 -mfpu=neon-vfpv4 -mvectorize-with-neon-quad
+AFLAGS_MODULE   = -DMODULE -marm -mcpu=cortex-a15 -mtune=cortex-a15 -mfpu=neon-vfpv4 -mvectorize-with-neon-quad
 LDFLAGS_MODULE  =
-CFLAGS_KERNEL	=
+CFLAGS_KERNEL	= -marm -mcpu=cortex-a15 -mtune=cortex-a15 -mfpu=neon-vfpv4 -mvectorize-with-neon-quad
 AFLAGS_KERNEL	=
 CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
 
