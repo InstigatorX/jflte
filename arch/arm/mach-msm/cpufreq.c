@@ -258,13 +258,6 @@ done:
 	return ret;
 }
 
-static int msm_cpufreq_verify(struct cpufreq_policy *policy)
-{
-	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
-			policy->cpuinfo.max_freq);
-	return 0;
-}
-
 static unsigned int msm_cpufreq_get_freq(unsigned int cpu)
 {
 	return acpuclk_get_rate(cpu);
@@ -455,22 +448,17 @@ static int msm_cpufreq_resume(struct cpufreq_policy *policy)
 	return 0;
 }
 
-static struct freq_attr *msm_freq_attr[] = {
-	&cpufreq_freq_attr_scaling_available_freqs,
-	NULL,
-};
-
 static struct cpufreq_driver msm_cpufreq_driver = {
 	/* lps calculations are handled here. */
 	.flags		= CPUFREQ_STICKY | CPUFREQ_CONST_LOOPS,
 	.init		= msm_cpufreq_init,
-	.verify		= msm_cpufreq_verify,
+	.verify		= cpufreq_generic_frequency_table_verify,
 	.target		= msm_cpufreq_target,
 	.get		= msm_cpufreq_get_freq,
 	.suspend	= msm_cpufreq_suspend,
 	.resume		= msm_cpufreq_resume,
 	.name		= "msm",
-	.attr		= msm_freq_attr,
+	.attr		= cpufreq_generic_attr,
 };
 
 static int __init msm_cpufreq_register(void)
