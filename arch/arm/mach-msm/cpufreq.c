@@ -349,7 +349,7 @@ static int __cpuinit msm_cpufreq_init(struct cpufreq_policy *policy)
 	if (cpu_is_msm8625())
 		cpumask_setall(policy->cpus);
 
-	if (cpufreq_frequency_table_cpuinfo(policy, table)) {
+	if (cpufreq_table_validate_and_show(policy, table)) {
 #ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
 		policy->cpuinfo.min_freq = CONFIG_MSM_CPU_FREQ_MIN;
 		policy->cpuinfo.max_freq = CONFIG_MSM_CPU_FREQ_MAX;
