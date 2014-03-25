@@ -168,8 +168,13 @@ static int set_cpu_freq(struct cpufreq_policy *policy, unsigned int new_freq)
 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
 
 	ret = acpuclk_set_rate(policy->cpu, new_freq, SETRATE_CPUFREQ);
-	if (!ret)
-		cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
+	if (ret) {
+		pr_err("cpu-msm: Failed to set cpu frequency to %d kHz\n",
+ 			freqs.new);
+		freqs.new = freqs.old;
+	}
+
+	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
 
 	/* Restore priority after clock ramp-up */
 	if (freqs.new > freqs.old && saved_sched_policy >= 0) {
