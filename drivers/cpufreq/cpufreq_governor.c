@@ -25,6 +25,7 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/workqueue.h>
+#include <linux/cpu.h>
 
 #include "cpufreq_governor.h"
 
@@ -333,8 +334,10 @@ int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		/* Initiate timer time stamp */
 		cpu_cdbs->time_stamp = ktime_get();
 
+		get_online_cpus();
 		for_each_cpu(j, policy->cpus)
 			dbs_timer_init(dbs_data, j, sampling_rate);
+		put_online_cpus();
 		break;
 
 	case CPUFREQ_GOV_STOP:
