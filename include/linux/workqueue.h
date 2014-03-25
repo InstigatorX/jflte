@@ -136,8 +136,7 @@ struct execute_work {
 #define __DELAYED_WORK_INITIALIZER(n, f, tflags) {			\
 	.work = __WORK_INITIALIZER((n).work, (f)),			\
 	.timer = __TIMER_INITIALIZER(delayed_work_timer_fn,		\
-				     0, (unsigned long)&(n),		\
-				     (tflags) | TIMER_IRQSAFE),		\
+			0, (unsigned long)&(n), (tflags)),		\
 	}
 
 #define DECLARE_WORK(n, f)						\
@@ -215,8 +214,7 @@ static inline unsigned int work_static(struct work_struct *work) { return 0; }
 	do {								\
 		INIT_WORK(&(_work)->work, (_func));			\
 		__setup_timer(&(_work)->timer, delayed_work_timer_fn,	\
-			      (unsigned long)(_work),			\
-			      (_tflags) | TIMER_IRQSAFE);		\
+			      (unsigned long)(_work), (_tflags));	\
 	} while (0)
 
 #define __INIT_DELAYED_WORK_ONSTACK(_work, _func, _tflags)		\
@@ -225,7 +223,7 @@ static inline unsigned int work_static(struct work_struct *work) { return 0; }
 		__setup_timer_on_stack(&(_work)->timer,			\
 				       delayed_work_timer_fn,		\
 				       (unsigned long)(_work),		\
-				       (_tflags) | TIMER_IRQSAFE);	\
+				       (_tflags));			\
 	} while (0)
 
 #define INIT_DELAYED_WORK(_work, _func)					\
