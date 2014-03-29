@@ -11,7 +11,6 @@
 #include <linux/lockdep.h>
 #include <linux/threads.h>
 #include <linux/atomic.h>
-#include <linux/cpumask.h>
 
 struct workqueue_struct;
 
@@ -114,15 +113,6 @@ struct delayed_work {
 	/* target workqueue and CPU ->timer uses to queue ->work */
 	struct workqueue_struct *wq;
 	int cpu;
-};
-
-/*
- * A struct for workqueue attributes.  This can be used to change
- * attributes of an unbound workqueue.
- */
-struct workqueue_attrs {
-	int			nice;		/* nice level */
-	cpumask_var_t		cpumask;	/* allowed CPUs */
 };
 
 static inline struct delayed_work *to_delayed_work(struct work_struct *work)
@@ -294,8 +284,8 @@ enum {
 	WQ_HIGHPRI		= 1 << 4, /* high priority */
 	WQ_CPU_INTENSIVE	= 1 << 5, /* cpu instensive workqueue */
 
-	__WQ_DRAINING		= 1 << 16, /* internal: workqueue is draining */
-	__WQ_ORDERED		= 1 << 17, /* internal: workqueue is ordered */	
+	WQ_DRAINING		= 1 << 6, /* internal: workqueue is draining */
+	WQ_RESCUER		= 1 << 7, /* internal: workqueue has rescuer */
 	/*
 	 * Per-cpu workqueues are generally preferred because they tend to
 	 * show better performance thanks to cache locality.  Per-cpu
@@ -432,7 +422,7 @@ __alloc_workqueue_key(const char *fmt, unsigned int flags, int max_active,
  * Pointer to the allocated workqueue on success, %NULL on failure.
  */
 #define alloc_ordered_workqueue(fmt, flags, args...)			\
-	alloc_workqueue(fmt, WQ_UNBOUND | __WQ_ORDERED | (flags), 1, ##args)
+	alloc_workqueue(fmt, WQ_UNBOUND | (flags), 1, ##args)
 
 #define create_workqueue(name)						\
 	alloc_workqueue((name), WQ_MEM_RECLAIM, 1)
@@ -442,11 +432,6 @@ __alloc_workqueue_key(const char *fmt, unsigned int flags, int max_active,
 	alloc_workqueue((name), WQ_UNBOUND | WQ_MEM_RECLAIM, 1)
 
 extern void destroy_workqueue(struct workqueue_struct *wq);
-
-struct workqueue_attrs *alloc_workqueue_attrs(gfp_t gfp_mask);
-void free_workqueue_attrs(struct workqueue_attrs *attrs);
-int apply_workqueue_attrs(struct workqueue_struct *wq,
-			  const struct workqueue_attrs *attrs);
 
 extern bool queue_work_on(int cpu, struct workqueue_struct *wq,
 			struct work_struct *work);
@@ -484,7 +469,7 @@ extern bool cancel_delayed_work_sync(struct delayed_work *dwork);
 
 extern void workqueue_set_max_active(struct workqueue_struct *wq,
 				     int max_active);
-extern bool workqueue_congested(int cpu, struct workqueue_struct *wq);
+extern bool workqueue_congested(unsigned int cpu, struct workqueue_struct *wq);
 extern unsigned int work_busy(struct work_struct *work);
 
 /*
@@ -515,12 +500,12 @@ static inline bool flush_delayed_work_sync(struct delayed_work *dwork)
 }
 
 #ifndef CONFIG_SMP
-static inline long work_on_cpu(int cpu, long (*fn)(void *), void *arg)
+static inline long work_on_cpu(unsigned int cpu, long (*fn)(void *), void *arg)
 {
 	return fn(arg);
 }
 #else
-long work_on_cpu(int cpu, long (*fn)(void *), void *arg);
+long work_on_cpu(unsigned int cpu, long (*fn)(void *), void *arg);
 #endif /* CONFIG_SMP */
 
 #ifdef CONFIG_FREEZER
