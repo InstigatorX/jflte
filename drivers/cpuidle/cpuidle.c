@@ -154,15 +154,11 @@ int cpuidle_idle_call(void)
 		return 0;
 	}
 
-	trace_cpu_idle_rcuidle(next_state, dev->cpu);
-
 	if (cpuidle_state_is_coupled(dev, drv, next_state))
 		entered_state = cpuidle_enter_state_coupled(dev, drv,
 							    next_state);
 	else
 		entered_state = cpuidle_enter_state(dev, drv, next_state);
-
-	trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, dev->cpu);
 
 	/* give the governor an opportunity to reflect on the outcome */
 	if (cpuidle_curr_governor->reflect)
@@ -296,6 +292,7 @@ static void poll_idle_init(struct cpuidle_driver *drv)
 	state->power_usage = -1;
 	state->flags = 0;
 	state->enter = poll_idle;
+	state->disabled = false;
 }
 #else
 static void poll_idle_init(struct cpuidle_driver *drv) {}
@@ -378,7 +375,7 @@ void cpuidle_disable_device(struct cpuidle_device *dev)
 {
 	struct cpuidle_driver *drv = cpuidle_get_cpu_driver(dev);
 
-	if (!dev->enabled)
+	if (!dev || !dev->enabled)
 		return;
 
 	if (!drv || !cpuidle_curr_governor)
@@ -405,15 +402,10 @@ EXPORT_SYMBOL_GPL(cpuidle_disable_device);
 static int __cpuidle_register_device(struct cpuidle_device *dev)
 {
 	int ret;
-	//struct device *cpu_dev;
-	//cpu_dev = get_cpu_device((unsigned long)dev->cpu);
-
 	struct cpuidle_driver *drv = cpuidle_get_cpu_driver(dev);
 
 	if (!try_module_get(drv->owner))
 		return -EINVAL;
-
-	init_completion(&dev->kobj_unregister);
 
 	per_cpu(cpuidle_devices, dev->cpu) = dev;
 	list_add(&dev->device_list, &cpuidle_detected_devices);
@@ -430,7 +422,6 @@ static int __cpuidle_register_device(struct cpuidle_device *dev)
 
 err_coupled:
 	cpuidle_remove_sysfs(dev);
-	wait_for_completion(&dev->kobj_unregister);
 err_sysfs:
 	list_del(&dev->device_list);
 	per_cpu(cpuidle_devices, dev->cpu) = NULL;
@@ -484,7 +475,6 @@ void cpuidle_unregister_device(struct cpuidle_device *dev)
 
 	cpuidle_remove_sysfs(dev);
 	list_del(&dev->device_list);
-	wait_for_completion(&dev->kobj_unregister);
 	per_cpu(cpuidle_devices, dev->cpu) = NULL;
 
 	cpuidle_coupled_unregister_device(dev);

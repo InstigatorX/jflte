@@ -30,8 +30,8 @@ extern int cpuidle_add_interface(struct device *dev);
 extern void cpuidle_remove_interface(struct device *dev);
 extern int cpuidle_add_device_sysfs(struct cpuidle_device *device);
 extern void cpuidle_remove_device_sysfs(struct cpuidle_device *device);
-extern int cpuidle_add_sysfs(struct device *dev);
-extern void cpuidle_remove_sysfs(struct device *dev);
+extern int cpuidle_add_sysfs(struct cpuidle_device *dev);
+extern void cpuidle_remove_sysfs(struct cpuidle_device *dev);
 
 #ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
 bool cpuidle_state_is_coupled(struct cpuidle_device *dev,
