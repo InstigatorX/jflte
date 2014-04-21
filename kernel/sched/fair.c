@@ -3665,7 +3665,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
 	int i;
 
 	if (local_group)
-		balance_cpu = group_balance_cpu(group);
+		balance_cpu = group_first_cpu(group);
 
 	/* Tally up the load of all CPUs in the group */
 	max_cpu_load = 0;
@@ -3680,8 +3680,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
 
 		/* Bias balancing toward cpus of our domain */
 		if (local_group) {
-			if (idle_cpu(i) && !first_idle_cpu &&
-					cpumask_test_cpu(i, sched_group_mask(group))) {
+			if (idle_cpu(i) && !first_idle_cpu) {
 				first_idle_cpu = 1;
 				balance_cpu = i;
 			}
