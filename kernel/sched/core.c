@@ -4390,7 +4390,9 @@ recheck:
 	 */
 	if (unlikely(policy == p->policy && (!rt_policy(policy) ||
 			param->sched_priority == p->rt_priority))) {
-		task_rq_unlock(rq, p, &flags);
+
+		__task_rq_unlock(rq);
+		raw_spin_unlock_irqrestore(&p->pi_lock, flags);
 		return 0;
 	}
 
