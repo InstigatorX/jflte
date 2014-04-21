@@ -1316,8 +1316,7 @@ static int cgroup_remount(struct super_block *sb, int *flags, char *data)
 		goto out_unlock;
 	}
 
-	/* clear out any existing files and repopulate subsystem files */
-	cgroup_clear_directory(cgrp->dentry);
+	/* (re)populate subsystem files */
 	cgroup_populate_dir(cgrp);
 
 	if (opts.release_agent)
@@ -3681,6 +3680,9 @@ static int cgroup_populate_dir(struct cgroup *cgrp)
 {
 	int err;
 	struct cgroup_subsys *ss;
+
+	/* First clear out any existing files */
+	cgroup_clear_directory(cgrp->dentry);
 
 	err = cgroup_add_files(cgrp, NULL, files, ARRAY_SIZE(files));
 	if (err < 0)
