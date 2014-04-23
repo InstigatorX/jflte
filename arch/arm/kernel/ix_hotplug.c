@@ -38,8 +38,6 @@
 #include <linux/mutex.h>
 #include <linux/platform_device.h>
 #include <linux/cpufreq.h>
-//#include <linux/kernel_stat.h>
-//#include <linux/tick.h>
 //#include <linux/rq_stats.h>
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
@@ -57,33 +55,28 @@
  * These two are scaled based on num_online_cpus()
  */
 
-static DEFINE_MUTEX(ix_hotplug_mutex);
-
 static struct delayed_work hotplug_decision_work;
 static struct work_struct suspend;
 static struct work_struct resume;
+static struct workqueue_struct *ixwq;
 
 static unsigned int enable_all_load = 800;
-static unsigned int enable_load[5] = {0, 100, 220, 320, 0};
-static unsigned int disable_load[5] = {0, 0, 30, 160, 240};
-static unsigned int sample_rate[5] = {0, 50, 150, 100, 50};
-static unsigned int load_enable;
-static unsigned int load_disable;
-static unsigned int sampling_rate;
-static unsigned int load_multiplier = 1;
-static unsigned int available_cpus = 4;
-static unsigned int online_sample = 1;
-static unsigned int offline_sample = 1;
-static unsigned int online_sampling_periods = 3;
-//static unsigned int offline_sampling_periods = 6;
-static unsigned int offline_sampling_periods[5] = {0, 0, 10, 5, 4};
+static unsigned int enable_load[5] = {0, 120, 220, 340, 0};
+static unsigned int disable_load[5] = {0, 0, 60, 120, 260};
+static unsigned int sample_rate[5] = {0, 25, 50, 100, 50};
+static unsigned int online_sampling_periods[5] = {0, 3, 3, 5, 0};
+static unsigned int offline_sampling_periods[5] = {0, 0, 8, 3, 4};
 static unsigned int online_cpus;
 static unsigned int min_cpus_online = 1;
+static unsigned int sampling_rate;
+static unsigned int available_cpus;
+static unsigned int online_sample;
+static unsigned int offline_sample;
 
 static void hotplug_online_single_work(void)
 {
 	cpu_up(online_cpus);
-	pr_info("ix_hotplug: CPU%d up.\n", online_cpus);
+	//pr_info("ix_hotplug: CPU%d up.\n", online_cpus);
 	return;
 }
 
@@ -94,7 +87,7 @@ static void hotplug_online_all_work(void)
 	for_each_possible_cpu(cpu) {
 		if (likely(!cpu_online(cpu))) {
 			cpu_up(cpu);
-			pr_info("ix_hotplug: CPU%d up.\n", cpu);
+			//pr_info("ix_hotplug: CPU%d up.\n", cpu);
 		}
 	}
 	return;
@@ -103,7 +96,7 @@ static void hotplug_online_all_work(void)
 static void hotplug_offline_work(void)
 {
 	cpu_down(online_cpus - 1);
-	pr_info("ix_hotplug: CPU%d down.\n", (online_cpus - 1));
+	//pr_info("ix_hotplug: CPU%d down.\n", (online_cpus - 1));
 	return;
 }
 
@@ -115,73 +108,70 @@ static void __ref hotplug_decision_work_fn(struct work_struct *work)
 	sched_get_nr_running_avg(&avg_running, &io_wait);
 	//rq_depth = rq_info.rq_avg;
 	
-	load_disable = disable_load[online_cpus];
-
-	if (avg_running <= load_disable && online_cpus > min_cpus_online) {
+	if ((avg_running <= disable_load[online_cpus]) &&
+			(online_cpus > min_cpus_online)) {
+		//pr_info("ix_hotplug: Disable Exit - %d %d %d %d %d\n", online_cpus, offline_sample, offline_sampling_periods[online_cpus], disable_load[online_cpus], avg_running);
 		if (offline_sample >= offline_sampling_periods[online_cpus]) {
+			//pr_info("ix_hotplug: Disable Single\n");
 			hotplug_offline_work();
-			offline_sample = 1;
+			offline_sample = 0;
+			online_cpus = num_online_cpus();
 			//pr_info("ix_hotplug: Threshold: %d Load: %d Sampling: %d RQ: %d\n", load_disable, avg_running, sampling_rate, rq_depth);
-		} else {
-			offline_sample++;
 		}
+		offline_sample++;
 		online_sample = 1;
 		goto exit;
 	}
 
-	if (online_cpus < available_cpus) {
-
-		if (avg_running >= enable_all_load) {
-			hotplug_online_all_work();
-			//pr_info("ix_hotplug: Threshold: %d Load: %d Sampling: %d RQ: %d\n", enable_all_load, avg_running, sampling_rate, rq_depth);
-			offline_sample = 1;
-			goto exit;
-		}				
-
-		load_enable = enable_load[online_cpus] * load_multiplier;
-
-		if (avg_running >= load_enable) {
-			if (online_sample >= online_sampling_periods) { 
-				hotplug_online_single_work();
-				online_sample = 1;
-				//pr_info("ix_hotplug: Threshold: %d Load: %d Sampling: %d RQ: %d\n", load_enable, avg_running, sampling_rate, rq_depth);
+	if ((avg_running >= enable_all_load || avg_running >= enable_load[online_cpus]) &&
+			(online_cpus < available_cpus)) {
+		//pr_info("ix_hotplug: Enable Exit - %d %d %d %d %d\n", online_cpus, online_sample, online_sampling_periods[online_cpus], enable_load[online_cpus], avg_running);
+		if (online_sample >= online_sampling_periods[online_cpus]) {
+			if (avg_running >= enable_all_load) {
+				//pr_info("ix_hotplug: Enable All\n");
+				hotplug_online_all_work();
 			} else {
-				online_sample++;
+				//pr_info("ix_hotplug: Enable Single\n");
+				hotplug_online_single_work();
 			}
-			offline_sample = 1;
-		}
+			online_cpus = num_online_cpus();
+			online_sample = 0;
+		}		
+		online_sample++;
+		offline_sample = 1;
+		goto exit;
 	}
-
+	
+	//pr_info("ix_hotplug: Idle, CPUs: %d %d\n", online_cpus, num_online_cpus());
+	
 exit:
 
-	online_cpus = num_online_cpus();
-
-	sampling_rate = sample_rate[online_cpus] * load_multiplier;
+	sampling_rate = sample_rate[online_cpus];
 	
-	//pr_info("ix_hotplug: CPUs: %d Load: %d Sampling: %d RQ: %d\n", online_cpus, avg_running, sampling_rate, rq_depth);
+	//pr_info("ix_hotplug: CPUs: %d Load: %d Sampling: %d\n", online_cpus, avg_running, sampling_rate);
 	
-	schedule_delayed_work_on(0, &hotplug_decision_work, msecs_to_jiffies(sampling_rate));
+	queue_delayed_work_on(0, ixwq, &hotplug_decision_work, msecs_to_jiffies(sampling_rate));
 }
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void ix_hotplug_suspend(struct work_struct *work)
 {
-	mutex_lock(&ix_hotplug_mutex);
-	load_multiplier = 3;
-	min_cpus_online = 1;
-	mutex_unlock(&ix_hotplug_mutex);
-	
-	//pr_info("ix_hotplug: early suspend handler\n");
+	cancel_delayed_work_sync(&hotplug_decision_work);
+	drain_workqueue(ixwq);
+	cpu_down(1);
+	cpu_down(2);
+	cpu_down(3);
+	pr_info("ix_hotplug: Early Suspend\n");
 }
 
 static void __ref ix_hotplug_resume(struct work_struct *work)
 {
-	mutex_lock(&ix_hotplug_mutex);
-	load_multiplier = 1;
-	min_cpus_online = 1;
-	mutex_unlock(&ix_hotplug_mutex);
-
-	//pr_info("ix_hotplug: late resume handler\n");
+	offline_sample = 1;
+	online_sample = 1;
+	cpu_up(1);
+	online_cpus = num_online_cpus();
+	queue_delayed_work_on(0,  ixwq, &hotplug_decision_work, msecs_to_jiffies(2500));
+	pr_info("ix_hotplug: Late Resume\n");
 }
 
 static void ix_hotplug_early_suspend(struct early_suspend *handler)
@@ -195,7 +185,7 @@ static void ix_hotplug_late_resume(struct early_suspend *handler)
 }
 
 static struct early_suspend early_suspend = {
-	.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 20,
+	.level = EARLY_SUSPEND_LEVEL_DISABLE_FB + 10,
 	.suspend = ix_hotplug_early_suspend,
 	.resume = ix_hotplug_late_resume,
 };
@@ -204,7 +194,13 @@ static struct early_suspend early_suspend = {
 static int __devinit ix_hotplug_probe(struct platform_device *pdev)
 {	
 	online_cpus = num_online_cpus();
+	available_cpus = num_possible_cpus();
 	
+	ixwq = alloc_workqueue("ix_hotplug_workqueue", WQ_HIGHPRI, 1);
+    
+    if (!ixwq)
+        return -ENOMEM;
+        
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	register_early_suspend(&early_suspend);
 #endif
@@ -217,9 +213,9 @@ static int __devinit ix_hotplug_probe(struct platform_device *pdev)
 	 * Give the system time to boot before fiddling with hotplugging.
 	 */
 
-	schedule_delayed_work_on(0, &hotplug_decision_work, msecs_to_jiffies(10000));
+	queue_delayed_work_on(0, ixwq, &hotplug_decision_work, msecs_to_jiffies(10000));
 
-	pr_info("ix_hotplug: v1.0 - InstigatorX\n");
+	pr_info("ix_hotplug: v2.0 - InstigatorX\n");
 	pr_info("ix_hotplug: based on v0.220 by _thalamus\n");
 	
 	return 0;
@@ -232,7 +228,9 @@ static struct platform_device ix_hotplug_device = {
 
 static int ix_hotplug_remove(struct platform_device *pdev)
 {
+
 	cancel_delayed_work_sync(&hotplug_decision_work);
+	drain_workqueue(ixwq);
 	
 	return 0;
 }

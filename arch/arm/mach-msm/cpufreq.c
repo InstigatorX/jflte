@@ -157,6 +157,7 @@ static int set_cpu_freq(struct cpufreq_policy *policy, unsigned int new_freq)
 
 	freqs.old = policy->cur;
 	freqs.new = new_freq;
+	freqs.cpu = policy->cpu;
 
 	/*
 	 * Put the caller into SCHED_FIFO priority to avoid cpu starvation
@@ -169,16 +170,11 @@ static int set_cpu_freq(struct cpufreq_policy *policy, unsigned int new_freq)
 		sched_setscheduler_nocheck(current, SCHED_FIFO, &param);
 	}
 
-	cpufreq_freq_transition_begin(policy, &freqs);
+	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
 
 	ret = acpuclk_set_rate(policy->cpu, new_freq, SETRATE_CPUFREQ);
-	if (ret) {
-		pr_err("cpu-msm: Failed to set cpu frequency to %d kHz\n",
- 			freqs.new);
-		freqs.new = freqs.old;
-	}
-
-	cpufreq_freq_transition_end(policy, &freqs, 0);
+	if (!ret)
+		cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
 
 	/* Restore priority after clock ramp-up */
 	if (freqs.new > freqs.old && saved_sched_policy >= 0) {
@@ -260,6 +256,13 @@ done:
 	free_cpumask_var(mask);
 	mutex_unlock(&per_cpu(cpufreq_suspend, policy->cpu).suspend_mutex);
 	return ret;
+}
+
+static int msm_cpufreq_verify(struct cpufreq_policy *policy)
+{
+	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
+			policy->cpuinfo.max_freq);
+	return 0;
 }
 
 static unsigned int msm_cpufreq_get_freq(unsigned int cpu)
@@ -346,7 +349,7 @@ static int __cpuinit msm_cpufreq_init(struct cpufreq_policy *policy)
 	if (cpu_is_msm8625())
 		cpumask_setall(policy->cpus);
 
-	if (cpufreq_table_validate_and_show(policy, table)) {
+	if (cpufreq_frequency_table_cpuinfo(policy, table)) {
 #ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
 		policy->cpuinfo.min_freq = CONFIG_MSM_CPU_FREQ_MIN;
 		policy->cpuinfo.max_freq = CONFIG_MSM_CPU_FREQ_MAX;
@@ -452,18 +455,22 @@ static int msm_cpufreq_resume(struct cpufreq_policy *policy)
 	return 0;
 }
 
+static struct freq_attr *msm_freq_attr[] = {
+	&cpufreq_freq_attr_scaling_available_freqs,
+	NULL,
+};
+
 static struct cpufreq_driver msm_cpufreq_driver = {
 	/* lps calculations are handled here. */
-	.flags		= CPUFREQ_STICKY | CPUFREQ_CONST_LOOPS |
-						CPUFREQ_NEED_INITIAL_FREQ_CHECK,
+	.flags		= CPUFREQ_STICKY | CPUFREQ_CONST_LOOPS,
 	.init		= msm_cpufreq_init,
-	.verify		= cpufreq_generic_frequency_table_verify,
+	.verify		= msm_cpufreq_verify,
 	.target		= msm_cpufreq_target,
 	.get		= msm_cpufreq_get_freq,
 	.suspend	= msm_cpufreq_suspend,
 	.resume		= msm_cpufreq_resume,
 	.name		= "msm",
-	.attr		= cpufreq_generic_attr,
+	.attr		= msm_freq_attr,
 };
 
 static int __init msm_cpufreq_register(void)
